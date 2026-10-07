@@ -1,9 +1,9 @@
 import streamlit as st
-import openai
 from pypdf import PdfReader
 import docx2txt
+import re
 
-# 1. Page Configuration & Styling
+# 1. Page Configuration & Professional Styling
 st.set_page_config(page_title="Limitless Blue AI", page_icon="🔷", layout="wide")
 
 st.markdown("""
@@ -11,27 +11,26 @@ st.markdown("""
     .main { background-color: #0b111e; color: #ffffff; }
     h1 { color: #4e8cff; font-family: 'Helvetica Neue', sans-serif; }
     .stButton>button { background-color: #1d4ed8; color: white; border-radius: 6px; }
+    .metric-box { padding: 12px; background-color: #162238; border-radius: 6px; margin: 8px 0; border-left: 4px solid #4e8cff; }
+    .risk-box { padding: 12px; background-color: #2b161d; border-radius: 6px; margin: 8px 0; border-left: 4px solid #ef4444; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Header
+# 2. Corporate Header
 st.markdown("# 🔷 Limitless Blue | Enterprise Document Intelligence Engine")
-st.markdown("### Instantly parse corporate and legal data into high-priority executive summaries.")
+st.markdown("### Instantly parse corporate data into high-priority executive summaries—completely secure & subscription-free.")
 st.markdown("---")
 
-# 3. Sidebar for API Configuration
-st.sidebar.title("Configuration")
-api_key = st.sidebar.text_input("Enter OpenAI API Key", type="password")
-
-# 4. File Uploader Area
+# 3. File Uploader Area
 uploaded_file = st.file_uploader("Upload Corporate File (PDF, DOCX, or TXT)", type=["pdf", "docx", "txt"])
 
-# 5. Document Processing Core
+# 4. Document Processing Core
 if uploaded_file is not None:
     text_content = ""
     file_type = uploaded_file.name.split(".")[-1].lower()
     
     try:
+        # Extract raw text locally based on file type
         if file_type == "pdf":
             reader = PdfReader(uploaded_file)
             for page in reader.pages:
@@ -41,68 +40,84 @@ if uploaded_file is not None:
         elif file_type == "txt":
             text_content = uploaded_file.read().decode("utf-8")
             
-        st.success(f"Successfully loaded: {uploaded_file.name}")
+        st.success(f"📂 Successfully analyzed: {uploaded_file.name}")
         
-        # --- FEATURE 1: EXECUTIVE SUMMARY GENERATION ---
+        # --- LOCAL INTELLIGENCE PROCESSING ---
+        # Parse sentences for categorization
+        sentences = re.split(r'(?<=[.!?])\s+', text_content)
+        
+        financial_insights = []
+        risk_insights = []
+        operational_insights = []
+        
+        # Scan text for critical corporate markers
+        for sentence in sentences:
+            s_lower = sentence.lower()
+            
+            # Identify financial items ($ signs, revenue, profits)
+            if any(k in s_lower for k in ["$", "revenue", "profit", "expenditure", "cost", "margin", "penalty"]):
+                if len(sentence.strip()) > 10:
+                    financial_insights.append(sentence.strip())
+                    
+            # Identify liabilities, risk, compliance and NDA terms
+            if any(k in s_lower for k in ["liabilit", "breach", "damages", "nondisclosure", "nda", "comply", "compliance", "restrict", "penalty"]):
+                if len(sentence.strip()) > 10:
+                    risk_insights.append(sentence.strip())
+                    
+            # Identify operational steps and directives
+            if any(k in s_lower for k in ["protocol", "tenet", "must", "extract", "auth", "step", "schedul", "scrub"]):
+                if len(sentence.strip()) > 10:
+                    operational_insights.append(sentence.strip())
+
+        # Clean duplicates from overlapping matches
+        financial_insights = list(set(financial_insights))[:6]
+        risk_insights = list(set(risk_insights))[:6]
+        operational_insights = list(set(operational_insights))[:6]
+
+        # --- GENERATING THE EXECUTIVE INTERFACE ---
         st.subheader("📋 Executive Intelligence Summary")
         
-        if not api_key:
-            st.warning("Please enter your OpenAI API Key in the sidebar to generate insights.")
-        else:
-            client = openai.OpenAI(api_key=api_key)
-            
-            # Simple caching so it doesn't re-run the API on every click
-            if "summary" not in st.session_state:
-                with st.spinner("Analyzing document structure and extracting key entities..."):
-                    response = client.chat.completions.create(
-                        model="gpt-4o-mini",
-                        messages=[
-                            {"role": "system", "content": "You are an elite corporate intelligence analyst. Summarize this document focusing on core actions, liabilities, financial metrics, and executive key takeaways. Use clean Markdown formatting."},
-                            {"role": "user", "content": f"Document Content:\n\n{text_content[:8000]}"} # Limits tokens safely
-                        ]
-                    )
-                    st.session_state.summary = response.choices[0].message.content
-            
-            st.markdown(st.session_state.summary)
-            
-            # --- FEATURE 2: DOWNLOAD BUTTON ---
-            st.download_button(
-                label="📥 Download Executive Summary (.txt)",
-                data=st.session_state.summary,
-                file_name=f"Summary_{uploaded_file.name}.txt",
-                mime="text/plain"
-            )
-            
-            # --- FEATURE 3: INTERACTIVE DOCUMENT CHAT ---
-            st.markdown("---")
-            st.subheader("💬 Interactive Intelligence Chat")
-            st.caption("Ask specific questions regarding compliance, data points, or contract clauses within this document.")
-            
-            if "messages" not in st.session_state:
-                st.session_state.messages = []
-
-            for message in st.session_state.messages:
-                with st.chat_message(message["role"]):
-                    st.markdown(message["content"])
-
-            if user_query := st.chat_input("Ask something about this document..."):
-                with st.chat_message("user"):
-                    st.markdown(user_query)
-                st.session_state.messages.append({"role": "user", "content": user_query})
+        # Build a downloadable summary text block dynamically
+        summary_text = f"EXECUTIVE SUMMARY FOR {uploaded_file.name.upper()}\n"
+        summary_text += "="*40 + "\n\n[FINANCIAL PERFORMANCE BUCKETS]\n"
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### 💵 Financial Metrics & Performance")
+            if financial_insights:
+                for item in financial_insights:
+                    st.markdown(f"<div class='metric-box'>📊 {item}</div>", unsafe_allow_html=True)
+                    summary_text += f"- {item}\n"
+            else:
+                st.info("No explicitly isolated financial metrics found.")
                 
-                with st.chat_message("assistant"):
-                    with st.spinner("Reviewing document context..."):
-                        chat_response = client.chat.completions.create(
-                            model="gpt-4o-mini",
-                            messages=[
-                                {"role": "system", "content": f"You are analyzing this document context:\n\n{text_content[:6000]}\n\nAnswer the user's questions strictly using facts from the document context provided. If not found, synthesize a professional response noting the context limitations."},
-                                *st.session_state.messages
-                            ]
-                        )
-                        answer = chat_response.choices[0].message.content
-                        st.markdown(answer)
-                st.session_state.messages.append({"role": "assistant", "content": answer})
+            st.markdown("#### ⚙️ Strategic & Operational Directives")
+            if operational_insights:
+                for item in operational_insights:
+                    st.markdown(f"<div class='metric-box'>🛠️ {item}</div>", unsafe_allow_html=True)
+                    summary_text += f"\n[OPERATIONAL DIRECTIVES]\n- {item}\n"
+            else:
+                st.info("No distinct operational steps detected.")
 
+        with col2:
+            st.markdown("#### ⚠️ Legal Liabilities & Risk Assessment")
+            if risk_insights:
+                for item in risk_insights:
+                    st.markdown(f"<div class='risk-box'>🚨 {item}</div>", unsafe_allow_html=True)
+                    summary_text += f"\n[LEGAL & RISK ASSESSMENT]\n- {item}\n"
+            else:
+                st.info("No critical legal compliance flags or liability values detected.")
+        
+        st.markdown("---")
+        
+        # --- DOWNLOAD BUTTON ---
+        st.download_button(
+            label="📥 Export Free Summary Report (.txt)",
+            data=summary_text,
+            file_name=f"Summary_{uploaded_file.name.split('.')[0]}.txt",
+            mime="text/plain"
+        )
+        
     except Exception as e:
-        st.error(f"Error parsing file: {e}")
-
+        st.error(f"Error parsing file locally: {e}")
