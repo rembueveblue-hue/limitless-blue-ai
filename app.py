@@ -48,7 +48,8 @@ st.markdown("""
             border: none;
         }
     </style>
-""", unsafe_html=True)
+""", unsafe_allow_html=True
+)
 
 st.title("🔷 Limitless Blue | Enterprise Document Intelligence Engine")
 st.subheader("Instantly parse corporate and legal data into high-priority executive summaries.")
