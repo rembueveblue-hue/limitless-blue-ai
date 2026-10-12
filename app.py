@@ -3,34 +3,34 @@ from pypdf import PdfReader
 import docx2txt
 import re
 
-# 1. Page Configuration & Professional Styling
+# 1. Professional UI Theme & Layout Tuning
 st.set_page_config(page_title="Limitless Blue AI", page_icon="🔷", layout="wide")
 
 st.markdown("""
     <style>
     .main { background-color: #0b111e; color: #ffffff; }
-    h1 { color: #4e8cff; font-family: 'Helvetica Neue', sans-serif; }
-    .stButton>button { background-color: #1d4ed8; color: white; border-radius: 6px; }
-    .metric-box { padding: 12px; background-color: #162238; border-radius: 6px; margin: 8px 0; border-left: 4px solid #4e8cff; }
-    .risk-box { padding: 12px; background-color: #2b161d; border-radius: 6px; margin: 8px 0; border-left: 4px solid #ef4444; }
+    h1 { color: #4e8cff; font-family: 'Helvetica Neue', sans-serif; font-weight: 700; }
+    h3 { color: #94a3b8; font-weight: 400; }
+    h4 { color: #f8fafc; border-bottom: 2px solid #1d4ed8; padding-bottom: 6px; margin-top: 15px; }
+    .stButton>button { background-color: #1d4ed8; color: white; border-radius: 6px; width: 100%; height: 45px; font-weight: bold; border: none; }
+    .metric-box { padding: 14px; background-color: #162238; border-radius: 8px; margin: 10px 0; border-left: 4px solid #4e8cff; font-size: 14px; line-height: 1.6; }
+    .risk-box { padding: 14px; background-color: #2b161d; border-radius: 8px; margin: 10px 0; border-left: 4px solid #ef4444; font-size: 14px; line-height: 1.6; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Corporate Header
+# 2. Executive Header Layout
 st.markdown("# 🔷 Limitless Blue | Enterprise Document Intelligence Engine")
-st.markdown("### Instantly parse corporate data into high-priority executive summaries—completely secure & subscription-free.")
+st.markdown("### Secure, localized data extraction for corporate and legal compliance evaluation.")
 st.markdown("---")
 
-# 3. File Uploader Area
+# 3. File Processing Module
 uploaded_file = st.file_uploader("Upload Corporate File (PDF, DOCX, or TXT)", type=["pdf", "docx", "txt"])
 
-# 4. Document Processing Core
 if uploaded_file is not None:
     text_content = ""
     file_type = uploaded_file.name.split(".")[-1].lower()
     
     try:
-        # Extract raw text locally based on file type
         if file_type == "pdf":
             reader = PdfReader(uploaded_file)
             for page in reader.pages:
@@ -40,82 +40,82 @@ if uploaded_file is not None:
         elif file_type == "txt":
             text_content = uploaded_file.read().decode("utf-8")
             
-        st.success(f"📂 Successfully analyzed: {uploaded_file.name}")
+        st.success(f"Successfully analyzed: {uploaded_file.name}")
         
-        # --- LOCAL INTELLIGENCE PROCESSING ---
-        # Parse sentences for categorization
+        # --- LOCAL NLP EXTRACTION MATRICES ---
         sentences = re.split(r'(?<=[.!?])\s+', text_content)
         
         financial_insights = []
         risk_insights = []
         operational_insights = []
         
-        # Scan text for critical corporate markers
         for sentence in sentences:
             s_lower = sentence.lower()
             
-            # Identify financial items ($ signs, revenue, profits)
+            # Financial Data Mapping
             if any(k in s_lower for k in ["$", "revenue", "profit", "expenditure", "cost", "margin", "penalty"]):
-                if len(sentence.strip()) > 10:
+                if len(sentence.strip()) > 15:
                     financial_insights.append(sentence.strip())
                     
-            # Identify liabilities, risk, compliance and NDA terms
+            # Legal Liabilities Mapping
             if any(k in s_lower for k in ["liabilit", "breach", "damages", "nondisclosure", "nda", "comply", "compliance", "restrict", "penalty"]):
-                if len(sentence.strip()) > 10:
+                if len(sentence.strip()) > 15:
                     risk_insights.append(sentence.strip())
                     
-            # Identify operational steps and directives
+            # Operations Mapping
             if any(k in s_lower for k in ["protocol", "tenet", "must", "extract", "auth", "step", "schedul", "scrub"]):
-                if len(sentence.strip()) > 10:
+                if len(sentence.strip()) > 15:
                     operational_insights.append(sentence.strip())
 
-        # Clean duplicates from overlapping matches
-        financial_insights = list(set(financial_insights))[:6]
-        risk_insights = list(set(risk_insights))[:6]
-        operational_insights = list(set(operational_insights))[:6]
+        # Eliminate duplication matrix
+        financial_insights = list(set(financial_insights))[:5]
+        risk_insights = list(set(risk_insights))[:5]
+        operational_insights = list(set(operational_insights))[:5]
 
-        # --- GENERATING THE EXECUTIVE INTERFACE ---
+        # --- DYNAMIC DASHBOARD OUTPUT ---
         st.subheader("📋 Executive Intelligence Summary")
         
-        # Build a downloadable summary text block dynamically
-        summary_text = f"EXECUTIVE SUMMARY FOR {uploaded_file.name.upper()}\n"
-        summary_text += "="*40 + "\n\n[FINANCIAL PERFORMANCE BUCKETS]\n"
+        summary_text = f"EXECUTIVE SUMMARY REPORT: {uploaded_file.name.upper()}\n"
+        summary_text += "="*50 + "\n\n"
         
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("#### 💵 Financial Metrics & Performance")
+            st.markdown("#### Financial Metrics & Performance")
             if financial_insights:
+                summary_text += "[FINANCIAL INSIGHTS]\n"
                 for item in financial_insights:
-                    st.markdown(f"<div class='metric-box'>📊 {item}</div>", unsafe_allow_html=True)
-                    summary_text += f"- {item}\n"
+                    st.markdown(f"<div class='metric-box'><b>[FINANCIAL]</b> {item}</div>", unsafe_allow_html=True)
+                    summary_text += f"• {item}\n"
             else:
                 st.info("No explicitly isolated financial metrics found.")
                 
-            st.markdown("#### ⚙️ Strategic & Operational Directives")
+            st.markdown("#### Strategic & Operational Directives")
             if operational_insights:
+                summary_text += "\n[OPERATIONAL DIRECTIVES]\n"
                 for item in operational_insights:
-                    st.markdown(f"<div class='metric-box'>🛠️ {item}</div>", unsafe_allow_html=True)
-                    summary_text += f"\n[OPERATIONAL DIRECTIVES]\n- {item}\n"
+                    st.markdown(f"<div class='metric-box'><b>[OPERATIONS]</b> {item}</div>", unsafe_allow_html=True)
+                    summary_text += f"• {item}\n"
             else:
                 st.info("No distinct operational steps detected.")
 
         with col2:
-            st.markdown("#### ⚠️ Legal Liabilities & Risk Assessment")
+            st.markdown("#### Legal Liabilities & Risk Assessment")
             if risk_insights:
+                summary_text += "\n[LEGAL & RISK ASSESSMENT]\n"
                 for item in risk_insights:
-                    st.markdown(f"<div class='risk-box'>🚨 {item}</div>", unsafe_allow_html=True)
-                    summary_text += f"\n[LEGAL & RISK ASSESSMENT]\n- {item}\n"
+                    st.markdown(f"<div class='risk-box'><b>[CRITICAL RISK]</b> {item}</div>", unsafe_allow_html=True)
+                    summary_text += f"• {item}\n"
             else:
-                st.info("No critical legal compliance flags or liability values detected.")
+                st.info("No critical legal compliance flags detected.")
         
         st.markdown("---")
         
-        # --- DOWNLOAD BUTTON ---
+        # --- REPORT EXPORT DATA ARCHITECTURE ---
         st.download_button(
-            label="📥 Export Free Summary Report (.txt)",
+            label="Export Free Summary Report (.txt)",
             data=summary_text,
-            file_name=f"Summary_{uploaded_file.name.split('.')[0]}.txt",
+            file_name=f"Summary_{uploaded_file.name.split('.')}.txt",
             mime="text/plain"
         )
         
