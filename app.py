@@ -4,6 +4,7 @@ import docx2txt
 import re
 import zipfile
 import io
+import pandas as pd
 from docx import Document
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
@@ -32,7 +33,6 @@ st.markdown("---")
 # 3. File Processing Module Supporting ZIP, PDF, DOCX, and TXT
 uploaded_file = st.file_uploader("Upload Corporate Files (PDF, DOCX, TXT, or ZIP Archive)", type=["pdf", "docx", "txt", "zip"])
 
-# Helper function to extract text contents from processed files
 def process_single_file(file_name, file_bytes):
     text_content = ""
     file_type = file_name.split(".")[-1].lower()
@@ -51,7 +51,6 @@ if uploaded_file is not None:
     file_name = uploaded_file.name
     file_bytes = uploaded_file.read()
     
-    # Process ZIP or Single Documents
     if file_name.endswith(".zip"):
         with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
             for z_info in z.infolist():
@@ -67,7 +66,6 @@ if uploaded_file is not None:
             all_files_data[file_name] = content
         st.success(f"Successfully analyzed: {file_name}")
 
-    # Combine or isolate text vectors for engine extraction
     combined_financials = []
     combined_risks = []
     combined_operations = []
@@ -83,7 +81,6 @@ if uploaded_file is not None:
             if any(k in s_lower for k in ["protocol", "tenet", "must", "extract", "auth", "step", "schedul", "scrub"]):
                 if len(sentence.strip()) > 15: combined_operations.append((name, sentence.strip()))
 
-    # Deduplicate findings lists safely
     financial_insights = list(set(combined_financials))[:6]
     risk_insights = list(set(combined_risks))[:6]
     operational_insights = list(set(combined_operations))[:6]
@@ -115,13 +112,14 @@ if uploaded_file is not None:
         else:
             st.info("No critical legal compliance flags detected.")
             
+        # --- FIXED DYNAMIC CHART RESIZING ---
         st.markdown("#### Data Extraction Insights Density")
-        chart_data = {
-            "Financial Elements": len(financial_insights),
-            "Operational Directives": len(operational_insights),
-            "Risk Factors Identified": len(risk_insights)
+        metric_counts = {
+            "Metrics": ["Financial Elements", "Operational Steps", "Risk Factors"],
+            "Count": [len(financial_insights), len(operational_insights), len(risk_insights)]
         }
-        st.bar_chart(chart_data)
+        chart_df = pd.DataFrame(metric_counts)
+        st.bar_chart(data=chart_df, x="Metrics", y="Count", use_container_width=True)
     
     st.markdown("---")
     
@@ -129,15 +127,13 @@ if uploaded_file is not None:
     st.subheader("📥 Export Intelligence Report Hub")
     format_choice = st.selectbox("Select Export Format Preference:", ["Portable Document Format (.pdf)", "Microsoft Word (.docx)", "Plain Text Document (.txt)"])
     
-    # Text Generator Matrix
     def build_txt_report():
         report = "LIMITLESS BLUE EXECUTIVE SUMMARY INTEL\n" + "="*50 + "\n\n"
-        report += "[FINANCIAL METRICS]\n" + "\n".join([f"• [{f}] {f}" for origin, f in financial_insights]) + "\n\n"
-        report += "[OPERATIONAL DIRECTIVES]\n" + "\n".join([f"• [{o}] {o}" for origin, o in operational_insights]) + "\n\n"
-        report += "[LEGAL RISK ASSESSMENT]\n" + "\n".join([f"• [{r}] {r}" for origin, r in risk_insights]) + "\n"
+        report += "[FINANCIAL METRICS]\n" + "\n".join([f"• [{origin}] {f}" for origin, f in financial_insights]) + "\n\n"
+        report += "[OPERATIONAL DIRECTIVES]\n" + "\n".join([f"• [{origin}] {o}" for origin, o in operational_insights]) + "\n\n"
+        report += "[LEGAL RISK ASSESSMENT]\n" + "\n".join([f"• [{origin}] {r}" for origin, r in risk_insights]) + "\n"
         return report.encode('utf-8')
 
-    # Word Generator Matrix
     def build_docx_report():
         doc = Document()
         doc.add_heading("Limitless Blue AI | Executive Report", 0)
@@ -151,13 +147,11 @@ if uploaded_file is not None:
         doc.save(target_stream)
         return target_stream.getvalue()
 
-    # Premium Color-Coded PDF Report Generator Matrix
     def build_pdf_report():
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=letter, title="Limitless Blue Executive Report")
         styles = getSampleStyleSheet()
         
-        # Define clean styles
         body_style = ParagraphStyle('ReportBody', parent=styles['Normal'], fontSize=10, leading=14, textColor=colors.HexColor('#334155'))
         fin_box_style = ParagraphStyle('FinBoxText', parent=body_style, textColor=colors.HexColor('#1e40af'))
         risk_box_style = ParagraphStyle('RiskBoxText', parent=body_style, textColor=colors.HexColor('#991b1b'))
@@ -172,13 +166,11 @@ if uploaded_file is not None:
         story.append(Spacer(1, 5))
         for origin, item in financial_insights + operational_insights:
             p = Paragraph(f"<b>[{origin}]</b> {item}", fin_box_style)
-            t = Table([[p]], colWidths=[500])
+            t = Table([[p]], colWidths=[540]) # FIXED WIDTH
             t.setStyle(TableStyle([
                 ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#eff6ff')),
                 ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#bfdbfe')),
                 ('PADDING', (0,0), (-1,-1), 10),
-                ('TOPPADDING', (0,0), (-1,-1), 8),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 8),
             ]))
             story.append(t)
             story.append(Spacer(1, 8))
@@ -188,11 +180,17 @@ if uploaded_file is not None:
         story.append(Spacer(1, 5))
         for origin, item in risk_insights:
             p = Paragraph(f"<b>[{origin}]</b> {item}", risk_box_style)
-            t = Table([[p]], colWidths=[500])
+            t = Table([[p]], colWidths=[540]) # FIXED WIDTH
             t.setStyle(TableStyle([
                 ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#fef2f2')),
                 ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#fecaca')),
                 ('PADDING', (0,0), (-1,-1), 10),
-                ('TOPPADDING', (0,0), (-1,-1), 8),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 8),
             ]))
+            story.append(t)
+            story.append(Spacer(1, 8))
+            
+        doc.build(story)
+        return buffer.getvalue()
+
+    # Route formatting requests dynamically based on selection boxes
+    if "(.pdf)" in format_choice:
