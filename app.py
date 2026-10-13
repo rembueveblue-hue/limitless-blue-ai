@@ -11,58 +11,23 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
-# 1. Page Configuration & Advanced Responsive Canvas Tuning
+# 1. Page Configuration & Professional Styling
 st.set_page_config(page_title="Limitless Blue AI", page_icon="🔷", layout="wide")
 
-# Advanced Responsive Media Queries and Carbon Geometric Tech Background Inject
 st.markdown("""
     <style>
-    /* Premium Carbon & Deep Blue Abstract Mesh Grid Background Matrix */
-    .stApp {
-        background-color: #060b13;
-        background-image: 
-            radial-gradient(at 0% 0%, rgba(30, 64, 175, 0.15) 0px, transparent 50%),
-            radial-gradient(at 100% 100%, rgba(29, 78, 216, 0.1) 0px, transparent 50%),
-            linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-        background-size: 100% 100%, 100% 100%, 24px 24px, 24px 24px;
-        color: #ffffff;
-    }
-    
-    /* Smart Fluid Header Rules for Multifunctional Mobile vs Laptop Scaling */
-    .responsive-header {
-        font-family: 'Helvetica Neue', sans-serif;
-        font-weight: 700;
-        color: #4e8cff;
-        line-height: 1.2;
-        margin-bottom: 4px;
-    }
-    .responsive-sub {
-        color: #94a3b8;
-        font-weight: 400;
-        margin-bottom: 20px;
-    }
-    
-    @media (max-width: 768px) {
-        .responsive-header { font-size: 22px !important; }
-        .responsive-sub { font-size: 13px !important; }
-        h4 { font-size: 15px !important; }
-    }
-    @media (min-width: 769px) {
-        .responsive-header { font-size: 34px !important; }
-        .responsive-sub { font-size: 17px !important; }
-    }
-
+    .main { background-color: #0b111e; color: #ffffff; }
+    h1 { color: #4e8cff; font-family: 'Helvetica Neue', sans-serif; font-weight: 700; }
+    h3 { color: #94a3b8; font-weight: 400; }
     h4 { color: #f8fafc; border-bottom: 2px solid #1d4ed8; padding-bottom: 6px; margin-top: 15px; }
-    .stButton>button { background-color: #1d4ed8; color: white; border-radius: 6px; width: 100%; height: 45px; font-weight: bold; border: none; }
-    .metric-box { padding: 14px; background-color: rgba(22, 34, 56, 0.7); border-radius: 8px; margin: 10px 0; border-left: 4px solid #4e8cff; font-size: 14px; line-height: 1.6; backdrop-filter: blur(4px); }
-    .risk-box { padding: 14px; background-color: rgba(43, 22, 29, 0.7); border-radius: 8px; margin: 10px 0; border-left: 4px solid #ef4444; font-size: 14px; line-height: 1.6; backdrop-filter: blur(4px); }
+    .metric-box { padding: 14px; background-color: #162238; border-radius: 8px; margin: 10px 0; border-left: 4px solid #4e8cff; font-size: 14px; line-height: 1.6; }
+    .risk-box { padding: 14px; background-color: #2b161d; border-radius: 8px; margin: 10px 0; border-left: 4px solid #ef4444; font-size: 14px; line-height: 1.6; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Fluid Executive Header Injection
-st.markdown("<div class='responsive-header'>🔷 Limitless Blue | Enterprise Document Intelligence Engine</div>", unsafe_allow_html=True)
-st.markdown("<div class='responsive-sub'>Secure, localized data extraction for corporate and legal compliance evaluation.</div>", unsafe_allow_html=True)
+# 2. Executive Header Layout
+st.markdown("# 🔷 Limitless Blue | Enterprise Document Intelligence Engine")
+st.markdown("### Secure, localized data extraction for corporate and legal compliance evaluation.")
 st.markdown("---")
 
 # 3. File Processing Module Supporting ZIP, PDF, DOCX, and TXT
@@ -148,7 +113,7 @@ if uploaded_file is not None:
             else:
                 st.info("No critical legal compliance flags detected.")
                 
-            # Fully Functional Responsive Analytics Tracker Chart Matrix
+            # Dynamic Density Tracker Graph
             st.markdown("#### Data Extraction Insights Density")
             metric_counts = {
                 "Metrics": ["Financial Elements", "Operational Steps", "Risk Factors"],
@@ -191,3 +156,31 @@ if uploaded_file is not None:
             body_style = ParagraphStyle('ReportBody', parent=styles['Normal'], fontSize=10, leading=14, textColor=colors.HexColor('#334155'))
             fin_box_style = ParagraphStyle('FinBoxText', parent=body_style, textColor=colors.HexColor('#1e40af'))
             risk_box_style = ParagraphStyle('RiskBoxText', parent=body_style, textColor=colors.HexColor('#991b1b'))
+            
+            story = [
+                Paragraph("<font size=24 color='#1d4ed8'><b>🔷 Limitless Blue Intelligence</b></font>", styles['Title']),
+                Paragraph("<b>Executive Data Extraction Analysis Report</b>", styles['Normal']),
+                Spacer(1, 15)
+            ]
+            
+            story.append(Paragraph("<font size=14 color='#1e3a8a'><b>💵 Financial & Operational Directives Summary</b></font>", styles['Heading2']))
+            story.append(Spacer(1, 5))
+            for origin, item in financial_insights + operational_insights:
+                p = Paragraph(f"<b>[{origin}]</b> {item}", fin_box_style)
+                t = Table([[p]], colWidths=[500])
+                t.setStyle(TableStyle([
+                    ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#eff6ff')),
+                    ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#bfdbfe')),
+                    ('PADDING', (0,0), (-1,-1), 10),
+                ]))
+                story.append(t)
+                story.append(Spacer(1, 8))
+                
+            story.append(Spacer(1, 10))
+            story.append(Paragraph("<font size=14 color='#7f1d1d'><b>🚨 Legal Liability & Compliance Exposure Risks</b></font>", styles['Heading2']))
+            story.append(Spacer(1, 5))
+            for origin, item in risk_insights:
+                p = Paragraph(f"<b>[{origin}]</b> {item}", risk_box_style)
+                t = Table([[p]], colWidths=[500])
+                t.setStyle(TableStyle([
+                    ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#fef2f2')),
