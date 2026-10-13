@@ -1,4 +1,5 @@
-openai>=1.0.0
 pypdf
 docx2txt
-fpdf2
+streamlit
+reportlab
+python-docx
