@@ -2,8 +2,15 @@ import streamlit as st
 from pypdf import PdfReader
 import docx2txt
 import re
+import zipfile
+import io
+from docx import Document
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
 
-# 1. Professional UI Theme & Layout Tuning
+# 1. Page Configuration & Professional Styling
 st.set_page_config(page_title="Limitless Blue AI", page_icon="🔷", layout="wide")
 
 st.markdown("""
@@ -12,7 +19,6 @@ st.markdown("""
     h1 { color: #4e8cff; font-family: 'Helvetica Neue', sans-serif; font-weight: 700; }
     h3 { color: #94a3b8; font-weight: 400; }
     h4 { color: #f8fafc; border-bottom: 2px solid #1d4ed8; padding-bottom: 6px; margin-top: 15px; }
-    .stButton>button { background-color: #1d4ed8; color: white; border-radius: 6px; width: 100%; height: 45px; font-weight: bold; border: none; }
     .metric-box { padding: 14px; background-color: #162238; border-radius: 8px; margin: 10px 0; border-left: 4px solid #4e8cff; font-size: 14px; line-height: 1.6; }
     .risk-box { padding: 14px; background-color: #2b161d; border-radius: 8px; margin: 10px 0; border-left: 4px solid #ef4444; font-size: 14px; line-height: 1.6; }
     </style>
@@ -23,101 +29,168 @@ st.markdown("# 🔷 Limitless Blue | Enterprise Document Intelligence Engine")
 st.markdown("### Secure, localized data extraction for corporate and legal compliance evaluation.")
 st.markdown("---")
 
-# 3. File Processing Module
-uploaded_file = st.file_uploader("Upload Corporate File (PDF, DOCX, or TXT)", type=["pdf", "docx", "txt"])
+# 3. File Processing Module Supporting ZIP, PDF, DOCX, and TXT
+uploaded_file = st.file_uploader("Upload Corporate Files (PDF, DOCX, TXT, or ZIP Archive)", type=["pdf", "docx", "txt", "zip"])
+
+# Helper function to extract text contents from processed files
+def process_single_file(file_name, file_bytes):
+    text_content = ""
+    file_type = file_name.split(".")[-1].lower()
+    if file_type == "pdf":
+        reader = PdfReader(io.BytesIO(file_bytes))
+        for page in reader.pages:
+            text_content += page.extract_text() or ""
+    elif file_type == "docx":
+        text_content = docx2txt.process(io.BytesIO(file_bytes))
+    elif file_type == "txt":
+        text_content = file_bytes.decode("utf-8", errors="ignore")
+    return text_content
 
 if uploaded_file is not None:
-    text_content = ""
-    file_type = uploaded_file.name.split(".")[-1].lower()
+    all_files_data = {}
+    file_name = uploaded_file.name
+    file_bytes = uploaded_file.read()
     
-    try:
-        if file_type == "pdf":
-            reader = PdfReader(uploaded_file)
-            for page in reader.pages:
-                text_content += page.extract_text() or ""
-        elif file_type == "docx":
-            text_content = docx2txt.process(uploaded_file)
-        elif file_type == "txt":
-            text_content = uploaded_file.read().decode("utf-8")
-            
-        st.success(f"Successfully analyzed: {uploaded_file.name}")
-        
-        # --- LOCAL NLP EXTRACTION MATRICES ---
+    # Process ZIP or Single Documents
+    if file_name.endswith(".zip"):
+        with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
+            for z_info in z.infolist():
+                if not z_info.is_dir() and z_info.filename.split(".")[-1].lower() in ["pdf", "docx", "txt"]:
+                    name = z_info.filename.split("/")[-1]
+                    content = process_single_file(name, z.read(z_info.filename))
+                    if content.strip():
+                        all_files_data[name] = content
+        st.success(f"Successfully extracted and unpacked ZIP archive: {len(all_files_data)} target documents processed.")
+    else:
+        content = process_single_file(file_name, file_bytes)
+        if content.strip():
+            all_files_data[file_name] = content
+        st.success(f"Successfully analyzed: {file_name}")
+
+    # Combine or isolate text vectors for engine extraction
+    combined_financials = []
+    combined_risks = []
+    combined_operations = []
+
+    for name, text_content in all_files_data.items():
         sentences = re.split(r'(?<=[.!?])\s+', text_content)
-        
-        financial_insights = []
-        risk_insights = []
-        operational_insights = []
-        
         for sentence in sentences:
             s_lower = sentence.lower()
-            
-            # Financial Data Mapping
             if any(k in s_lower for k in ["$", "revenue", "profit", "expenditure", "cost", "margin", "penalty"]):
-                if len(sentence.strip()) > 15:
-                    financial_insights.append(sentence.strip())
-                    
-            # Legal Liabilities Mapping
+                if len(sentence.strip()) > 15: combined_financials.append((name, sentence.strip()))
             if any(k in s_lower for k in ["liabilit", "breach", "damages", "nondisclosure", "nda", "comply", "compliance", "restrict", "penalty"]):
-                if len(sentence.strip()) > 15:
-                    risk_insights.append(sentence.strip())
-                    
-            # Operations Mapping
+                if len(sentence.strip()) > 15: combined_risks.append((name, sentence.strip()))
             if any(k in s_lower for k in ["protocol", "tenet", "must", "extract", "auth", "step", "schedul", "scrub"]):
-                if len(sentence.strip()) > 15:
-                    operational_insights.append(sentence.strip())
+                if len(sentence.strip()) > 15: combined_operations.append((name, sentence.strip()))
 
-        # Eliminate duplication matrix
-        financial_insights = list(set(financial_insights))[:5]
-        risk_insights = list(set(risk_insights))[:5]
-        operational_insights = list(set(operational_insights))[:5]
+    # Deduplicate findings lists safely
+    financial_insights = list(set(combined_financials))[:6]
+    risk_insights = list(set(combined_risks))[:6]
+    operational_insights = list(set(combined_operations))[:6]
 
-        # --- DYNAMIC DASHBOARD OUTPUT ---
-        st.subheader("📋 Executive Intelligence Summary")
-        
-        summary_text = f"EXECUTIVE SUMMARY REPORT: {uploaded_file.name.upper()}\n"
-        summary_text += "="*50 + "\n\n"
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("#### Financial Metrics & Performance")
-            if financial_insights:
-                summary_text += "[FINANCIAL INSIGHTS]\n"
-                for item in financial_insights:
-                    st.markdown(f"<div class='metric-box'><b>[FINANCIAL]</b> {item}</div>", unsafe_allow_html=True)
-                    summary_text += f"• {item}\n"
-            else:
-                st.info("No explicitly isolated financial metrics found.")
-                
-            st.markdown("#### Strategic & Operational Directives")
-            if operational_insights:
-                summary_text += "\n[OPERATIONAL DIRECTIVES]\n"
-                for item in operational_insights:
-                    st.markdown(f"<div class='metric-box'><b>[OPERATIONS]</b> {item}</div>", unsafe_allow_html=True)
-                    summary_text += f"• {item}\n"
-            else:
-                st.info("No distinct operational steps detected.")
+    # --- DYNAMIC DASHBOARD SCREEN OUTPUT (THE POINT-FORM CHARM) ---
+    st.subheader("📋 Executive Intelligence Summary")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("#### Financial Metrics & Performance")
+        if financial_insights:
+            for origin, item in financial_insights:
+                st.markdown(f"<div class='metric-box'><b>[FINANCIAL - {origin}]</b> {item}</div>", unsafe_allow_html=True)
+        else:
+            st.info("No explicitly isolated financial metrics found.")
+            
+        st.markdown("#### Strategic & Operational Directives")
+        if operational_insights:
+            for origin, item in operational_insights:
+                st.markdown(f"<div class='metric-box'><b>[OPERATIONS - {origin}]</b> {item}</div>", unsafe_allow_html=True)
+        else:
+            st.info("No distinct operational steps detected.")
 
-        with col2:
-            st.markdown("#### Legal Liabilities & Risk Assessment")
-            if risk_insights:
-                summary_text += "\n[LEGAL & RISK ASSESSMENT]\n"
-                for item in risk_insights:
-                    st.markdown(f"<div class='risk-box'><b>[CRITICAL RISK]</b> {item}</div>", unsafe_allow_html=True)
-                    summary_text += f"• {item}\n"
-            else:
-                st.info("No critical legal compliance flags detected.")
+    with col2:
+        st.markdown("#### Legal Liabilities & Risk Assessment")
+        if risk_insights:
+            for origin, item in risk_insights:
+                st.markdown(f"<div class='risk-box'><b>[CRITICAL RISK - {origin}]</b> {item}</div>", unsafe_allow_html=True)
+        else:
+            st.info("No critical legal compliance flags detected.")
+            
+        st.markdown("#### Data Extraction Insights Density")
+        chart_data = {
+            "Financial Elements": len(financial_insights),
+            "Operational Directives": len(operational_insights),
+            "Risk Factors Identified": len(risk_insights)
+        }
+        st.bar_chart(chart_data)
+    
+    st.markdown("---")
+    
+    # --- MULTI-FORMAT ENTERPRISE EXPORT ENGINE HUB ---
+    st.subheader("📥 Export Intelligence Report Hub")
+    format_choice = st.selectbox("Select Export Format Preference:", ["Portable Document Format (.pdf)", "Microsoft Word (.docx)", "Plain Text Document (.txt)"])
+    
+    # Text Generator Matrix
+    def build_txt_report():
+        report = "LIMITLESS BLUE EXECUTIVE SUMMARY INTEL\n" + "="*50 + "\n\n"
+        report += "[FINANCIAL METRICS]\n" + "\n".join([f"• [{f[0]}] {f[1]}" for f in financial_insights]) + "\n\n"
+        report += "[OPERATIONAL DIRECTIVES]\n" + "\n".join([f"• [{o[0]}] {o[1]}" for o in operational_insights]) + "\n\n"
+        report += "[LEGAL RISK ASSESSMENT]\n" + "\n".join([f"• [{r[0]}] {r[1]}" for r in risk_insights]) + "\n"
+        return report.encode('utf-8')
+
+    # Word Generator Matrix
+    def build_docx_report():
+        doc = Document()
+        doc.add_heading("Limitless Blue AI | Executive Report", 0)
+        doc.add_heading("Financial Insights", level=1)
+        for origin, item in financial_insights: doc.add_paragraph(f"[{origin}] {item}", style='List Bullet')
+        doc.add_heading("Operational Directives", level=1)
+        for origin, item in operational_insights: doc.add_paragraph(f"[{origin}] {item}", style='List Bullet')
+        doc.add_heading("Legal Liabilities & Risks", level=1)
+        for origin, item in risk_insights: doc.add_paragraph(f"[{origin}] {item}", style='List Bullet')
+        target_stream = io.BytesIO()
+        doc.save(target_stream)
+        return target_stream.getvalue()
+
+    # Premium Color-Coded PDF Report Generator Matrix
+    def build_pdf_report():
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter, title="Limitless Blue Executive Report")
+        styles = getSampleStyleSheet()
         
-        st.markdown("---")
+        # Define clean, explicit paragraph style guidelines
+        body_style = ParagraphStyle('ReportBody', parent=styles['Normal'], fontSize=10, leading=14, textColor=colors.HexColor('#334155'))
+        fin_box_style = ParagraphStyle('FinBoxText', parent=body_style, textColor=colors.HexColor('#1e40af'))
+        risk_box_style = ParagraphStyle('RiskBoxText', parent=body_style, textColor=colors.HexColor('#991b1b'))
         
-        # --- REPORT EXPORT DATA ARCHITECTURE ---
-        st.download_button(
-            label="Export Free Summary Report (.txt)",
-            data=summary_text,
-            file_name=f"Summary_{uploaded_file.name.split('.')}.txt",
-            mime="text/plain"
-        )
+        story = [
+            Paragraph("<font size=24 color='#1d4ed8'><b>🔷 Limitless Blue Intelligence</b></font>", styles['Title']),
+            Paragraph("<b>Executive Data Extraction Analysis Report</b>", styles['Normal']),
+            Spacer(1, 15)
+        ]
         
-    except Exception as e:
-        st.error(f"Error parsing file locally: {e}")
+        story.append(Paragraph("<font size=14 color='#1e3a8a'><b>💵 Financial & Operational Directives Summary</b></font>", styles['Heading2']))
+        story.append(Spacer(1, 5))
+        for origin, item in financial_insights + operational_insights:
+            p = Paragraph(f"<b>[{origin}]</b> {item}", fin_box_style)
+            t = Table([[p]], colWidths=[460])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#eff6ff')),
+                ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#bfdbfe')),
+                ('PADDING', (0,0), (-1,-1), 10),
+                ('TOPPADDING', (0,0), (-1,-1), 8),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+            ]))
+            story.append(t)
+            story.append(Spacer(1, 8))
+            
+        story.append(Spacer(1, 10))
+        story.append(Paragraph("<font size=14 color='#7f1d1d'><b>🚨 Legal Liability & Compliance Exposure Risks</b></font>", styles['Heading2']))
+        story.append(Spacer(1, 5))
+        for origin, item in risk_insights:
+            p = Paragraph(f"<b>[{origin}]</b> {item}", risk_box_style)
+            t = Table([[p]], colWidths=[460])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#fef2f2')),
+                ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#fecaca')),
+                ('PADDING', (0,0), (-1,-1), 10),
+                ('TOPPADDING', (0,0), (-1,-1), 8),
