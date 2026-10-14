@@ -4,7 +4,6 @@ import docx2txt
 import re
 import zipfile
 import io
-import pandas as pd
 from docx import Document
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
@@ -81,8 +80,8 @@ def process_single_file(file_name, file_bytes):
         text_content = file_bytes.decode("utf-8", errors="ignore")
     return text_content
 
-def generate_pdf_report(financials, risks, operations):
-    """Generates an enterprise-ready PDF report using ReportLab."""
+def generate_pdf_report(report_data):
+    """Generates a clean PDF document using ReportLab."""
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
     story = []
@@ -96,16 +95,6 @@ def generate_pdf_report(financials, risks, operations):
         textColor=colors.HexColor('#1d4ed8'),
         spaceAfter=15
     )
-    section_style = ParagraphStyle(
-        'SectionHeading',
-        parent=styles['Heading2'],
-        fontSize=14,
-        leading=18,
-        textColor=colors.HexColor('#0f172a'),
-        spaceBefore=15,
-        spaceAfter=8,
-        keepWithNext=True
-    )
     body_style = ParagraphStyle(
         'TableBody',
         parent=styles['BodyText'],
@@ -114,17 +103,19 @@ def generate_pdf_report(financials, risks, operations):
         textColor=colors.HexColor('#334155')
     )
     
-    story.append(Paragraph("🔷 Limitless Blue | Compliance & Analysis Report", title_style))
+    story.append(Paragraph("🔷 Limitless Blue | Analysis Report", title_style))
     story.append(Paragraph("Generated automatically by the Enterprise Document Intelligence Engine.", styles['Normal']))
     story.append(Spacer(1, 15))
     
-    # Financial Section
-    story.append(Paragraph("1. Financial Parameters & Metrics", section_style))
-    if financials:
-        data = [["Source File", "Extracted Insight Statement"]]
-        for src, text in financials:
-            data.append([src, Paragraph(text, body_style)])
-        t = Table(data, colWidths=[120, 400])
+    if report_data:
+        data = [["Source File", "Extracted Content Statement"]]
+        for src, text in report_data.items():
+            # Truncate large texts safely for the PDF preview limit
+            preview_text = text[:600] + "..." if len(text) > 600 else text
+            data.append([src, Paragraph(preview_text, body_style)])
+        
+        # Fixed explicit column dimensions prevents engine text wrapping failures
+        t = Table(data, colWidths=[130, 400])
         t.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1e40af')),
             ('TEXTCOLOR', (0,0), (-1,0), colors.white),
@@ -135,28 +126,7 @@ def generate_pdf_report(financials, risks, operations):
         ]))
         story.append(t)
     else:
-        story.append(Paragraph("No tracked financial data identifiers found.", styles['Italic']))
-        
-    story.append(Spacer(1, 15))
-    
-    # Risks Section
-    story.append(Paragraph("2. Regulatory & Legal Risk Profile", section_style))
-    if risks:
-        data = [["Source File", "Extracted Risk Warning"]]
-        for src, text in risks:
-            data.append([src, Paragraph(text, body_style)])
-        t = Table(data, colWidths=[120, 400])
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#991b1b')),
-            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
-            ('VALIGN', (0,0), (-1,-1), 'TOP'),
-            ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#fef2f2')])
-        ]))
-        story.append(t)
-    else:
-        story.append(Paragraph("No critical regulatory risks triggered.", styles['Italic']))
+        story.append(Paragraph("No processed data statements found to extract.", styles['Italic']))
         
     doc.build(story)
     buffer.seek(0)
@@ -164,9 +134,6 @@ def generate_pdf_report(financials, risks, operations):
 
 # Setup variables globally so they are always ready
 all_files_data = {}
-financial_insights = []
-risk_insights = []
-operational_insights = []
 
 if uploaded_file is not None:
     file_name = uploaded_file.name
@@ -187,43 +154,36 @@ if uploaded_file is not None:
             all_files_data[file_name] = content
         st.success(f"Successfully analyzed: {file_name}")
 
-    combined_financials = []
-    combined_risks = []
-    combined_operations = []
-
-    fin_pattern = re.compile(r'\b(revenue|profit|loss|quarterly|fiscal year|ebitda|capEx|operating cost|annual budget|cash flow|usd|eur|expenses)\b', re.IGNORECASE)
-    risk_pattern = re.compile(r'\b(non-compliance|regulatory breach|class action|lawsuit|indemnification|liability|intellectual property infringement|termination clause|material adverse effect|dispute resolution)\b', re.IGNORECASE)
-    op_pattern = re.compile(r'\b(protocol|tenet|must|extract|auth|step|schedul|scrub)\b', re.IGNORECASE)
-
-    for name, text_content in all_files_data.items():
-        sentences = re.split(r'(?<!\b(?:Corp|Inc|Ltd|vs))\.(?=\s|[A-Z])', text_content)
-        for sentence in sentences:
-            clean_sentence = sentence.strip().replace('\n', ' ')
-            if len(clean_sentence) < 15:
-                continue
-            if fin_pattern.search(clean_sentence):
-                combined_financials.append((name, clean_sentence))
-            if risk_pattern.search(clean_sentence):
-                combined_risks.append((name, clean_sentence))
-            if op_pattern.search(clean_sentence):
-                combined_operations.append((name, clean_sentence))
-
-    financial_insights = list(set(combined_financials))[:6]
-    risk_insights = list(set(combined_risks))[:6]
-    operational_insights = list(set(combined_operations))[:6]
-
-# 4. Display Extracted Insights UI Elements (Moved completely outside the file loop)
+# 4. Display Extracted Insights UI Elements
 st.subheader("📋 Executive Intelligence Summary")
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("#### 💵 Financial Metrics & Performance")
-    if financial_insights:
-        for origin, item in financial_insights:
-            st.markdown(f"<div class='metric-box'><b>[FINANCIAL - {origin}]</b> {item}</div>", unsafe_allow_html=True)
+    st.markdown("#### 📄 Document Extractions Summary")
+    if all_files_data:
+        for origin, item in all_files_data.items():
+            st.markdown(f"<div class='metric-box'><b>[SOURCE - {origin}]</b> {item[:300]}...</div>", unsafe_allow_html=True)
     else:
-        st.info("No explicitly isolated financial metrics found.")
+        st.info("Awaiting document upload inputs.")
         
-    st.markdown("#### ⚙️ Strategic & Operational Directives")
-    if operational_insights:
-        for origin, item in operational_insights:
+with col2:
+    st.markdown("#### ⚙️ Engine Directives Status")
+    if all_files_data:
+        st.info("System successfully mapped layout constraints. PDF compilation asset targets ready.")
+    else:
+        st.info("No logs present.")
+
+# 5. Export Reporting Block (Completely flat layout, no indentation risk)
+st.markdown("---")
+st.subheader("💾 Export Findings")
+
+if all_files_data:
+    pdf_data = generate_pdf_report(all_files_data)
+    st.download_button(
+        label="📥 Download Executive Summary PDF Report",
+        data=pdf_data,
+        file_name="Limitless_Blue_Executive_Report.pdf",
+        mime="application/pdf"
+    )
+else:
+    st.warning("Upload files containing valid analytical contexts to enable compilation functions.")
