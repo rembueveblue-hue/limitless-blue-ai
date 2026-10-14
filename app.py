@@ -124,7 +124,7 @@ def generate_pdf_report(financials, risks, operations):
         data = [["Source File", "Extracted Insight Statement"]]
         for src, text in financials:
             data.append([src, Paragraph(text, body_style)])
-        t = Table(data, colWidths=[120, 440])
+        t = Table(data, colWidths=[120, 400])
         t.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1e40af')),
             ('TEXTCOLOR', (0,0), (-1,0), colors.white),
@@ -145,7 +145,7 @@ def generate_pdf_report(financials, risks, operations):
         data = [["Source File", "Extracted Risk Warning"]]
         for src, text in risks:
             data.append([src, Paragraph(text, body_style)])
-        t = Table(data, colWidths=[120, 440])
+        t = Table(data, colWidths=[120, 400])
         t.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#991b1b')),
             ('TEXTCOLOR', (0,0), (-1,0), colors.white),
@@ -162,64 +162,68 @@ def generate_pdf_report(financials, risks, operations):
     buffer.seek(0)
     return buffer
 
+# Setup variables globally so they are always ready
+all_files_data = {}
+financial_insights = []
+risk_insights = []
+operational_insights = []
+
 if uploaded_file is not None:
-    all_files_data = {}
     file_name = uploaded_file.name
     file_bytes = uploaded_file.read()
     
-    try:
-        if file_name.endswith(".zip"):
-            with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
-                for z_info in z.infolist():
-                    if not z_info.is_dir() and z_info.filename.split(".")[-1].lower() in ["pdf", "docx", "txt"]:
-                        name = z_info.filename.split("/")[-1]
-                        content = process_single_file(name, z.read(z_info.filename))
-                        if content.strip():
-                            all_files_data[name] = content
-            st.success(f"Successfully extracted and unpacked ZIP archive: {len(all_files_data)} target documents processed.")
-        else:
-            content = process_single_file(file_name, file_bytes)
-            if content.strip():
-                all_files_data[file_name] = content
-            st.success(f"Successfully analyzed: {file_name}")
+    if file_name.endswith(".zip"):
+        with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
+            for z_info in z.infolist():
+                if not z_info.is_dir() and z_info.filename.split(".")[-1].lower() in ["pdf", "docx", "txt"]:
+                    name = z_info.filename.split("/")[-1]
+                    content = process_single_file(name, z.read(z_info.filename))
+                    if content.strip():
+                        all_files_data[name] = content
+        st.success(f"Successfully processed ZIP archive: {len(all_files_data)} target documents.")
+    else:
+        content = process_single_file(file_name, file_bytes)
+        if content.strip():
+            all_files_data[file_name] = content
+        st.success(f"Successfully analyzed: {file_name}")
 
-        combined_financials = []
-        combined_risks = []
-        combined_operations = []
+    combined_financials = []
+    combined_risks = []
+    combined_operations = []
 
-        fin_pattern = re.compile(r'\b(revenue|profit|loss|quarterly|fiscal year|ebitda|capEx|operating cost|annual budget|cash flow|usd|eur|expenses)\b', re.IGNORECASE)
-        risk_pattern = re.compile(r'\b(non-compliance|regulatory breach|class action|lawsuit|indemnification|liability|intellectual property infringement|termination clause|material adverse effect|dispute resolution)\b', re.IGNORECASE)
-        op_pattern = re.compile(r'\b(protocol|tenet|must|extract|auth|step|schedul|scrub)\b', re.IGNORECASE)
+    fin_pattern = re.compile(r'\b(revenue|profit|loss|quarterly|fiscal year|ebitda|capEx|operating cost|annual budget|cash flow|usd|eur|expenses)\b', re.IGNORECASE)
+    risk_pattern = re.compile(r'\b(non-compliance|regulatory breach|class action|lawsuit|indemnification|liability|intellectual property infringement|termination clause|material adverse effect|dispute resolution)\b', re.IGNORECASE)
+    op_pattern = re.compile(r'\b(protocol|tenet|must|extract|auth|step|schedul|scrub)\b', re.IGNORECASE)
 
-        for name, text_content in all_files_data.items():
-            sentences = re.split(r'(?<!\b(?:Corp|Inc|Ltd|vs))\.(?=\s|[A-Z])', text_content)
-            for sentence in sentences:
-                clean_sentence = sentence.strip().replace('\n', ' ')
-                if len(clean_sentence) < 15:
-                    continue
-                if fin_pattern.search(clean_sentence):
-                    combined_financials.append((name, clean_sentence))
-                if risk_pattern.search(clean_sentence):
-                    combined_risks.append((name, clean_sentence))
-                if op_pattern.search(clean_sentence):
-                    combined_operations.append((name, clean_sentence))
+    for name, text_content in all_files_data.items():
+        sentences = re.split(r'(?<!\b(?:Corp|Inc|Ltd|vs))\.(?=\s|[A-Z])', text_content)
+        for sentence in sentences:
+            clean_sentence = sentence.strip().replace('\n', ' ')
+            if len(clean_sentence) < 15:
+                continue
+            if fin_pattern.search(clean_sentence):
+                combined_financials.append((name, clean_sentence))
+            if risk_pattern.search(clean_sentence):
+                combined_risks.append((name, clean_sentence))
+            if op_pattern.search(clean_sentence):
+                combined_operations.append((name, clean_sentence))
 
-        financial_insights = list(set(combined_financials))[:6]
-        risk_insights = list(set(combined_risks))[:6]
-        operational_insights = list(set(combined_operations))[:6]
+    financial_insights = list(set(combined_financials))[:6]
+    risk_insights = list(set(combined_risks))[:6]
+    operational_insights = list(set(combined_operations))[:6]
 
-    except Exception as e:
-        st.error(f"An unexpected data layout extraction fault occurred: {str(e)}")
-        financial_insights, risk_insights, operational_insights = [], [], []
+# 4. Display Extracted Insights UI Elements (Moved completely outside the file loop)
+st.subheader("📋 Executive Intelligence Summary")
+col1, col2 = st.columns(2)
 
-    # 4. Display Extracted Insights UI Elements
-    st.subheader("📋 Executive Intelligence Summary")
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("#### 💵 Financial Metrics & Performance")
-        if financial_insights:
-            for origin, item in financial_insights:
-                st.markdown(f"<div class='metric-box'><b>[FINANCIAL - {origin}]</b> {item}</div>", unsafe_allow_html=True)
-        else:
-        st.warning("Upload files containing valid analytical contexts to enable compilation functions.")
+with col1:
+    st.markdown("#### 💵 Financial Metrics & Performance")
+    if financial_insights:
+        for origin, item in financial_insights:
+            st.markdown(f"<div class='metric-box'><b>[FINANCIAL - {origin}]</b> {item}</div>", unsafe_allow_html=True)
+    else:
+        st.info("No explicitly isolated financial metrics found.")
+        
+    st.markdown("#### ⚙️ Strategic & Operational Directives")
+    if operational_insights:
+        for origin, item in operational_insights:
