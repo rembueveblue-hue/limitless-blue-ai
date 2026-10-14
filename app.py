@@ -124,7 +124,7 @@ def generate_pdf_report(financials, risks, operations):
         data = [["Source File", "Extracted Insight Statement"]]
         for src, text in financials:
             data.append([src, Paragraph(text, body_style)])
-        t = Table(data, colWidths=[120, 420])
+        t = Table(data, colWidths=[120, 440])
         t.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1e40af')),
             ('TEXTCOLOR', (0,0), (-1,0), colors.white),
@@ -145,7 +145,7 @@ def generate_pdf_report(financials, risks, operations):
         data = [["Source File", "Extracted Risk Warning"]]
         for src, text in risks:
             data.append([src, Paragraph(text, body_style)])
-        t = Table(data, colWidths=[120, 420])
+        t = Table(data, colWidths=[120, 440])
         t.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#991b1b')),
             ('TEXTCOLOR', (0,0), (-1,0), colors.white),
