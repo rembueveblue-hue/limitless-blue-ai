@@ -81,7 +81,7 @@ def process_single_file(file_name, file_bytes):
         text_content = file_bytes.decode("utf-8", errors="ignore")
     return text_content
 
-def generate_pdf_report(financials, risks):
+def generate_pdf_report(financials, risks, operations):
     """Generates an enterprise-ready PDF report using ReportLab."""
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
@@ -114,25 +114,21 @@ def generate_pdf_report(financials, risks):
         textColor=colors.HexColor('#334155')
     )
     
-    # Title Block
     story.append(Paragraph("🔷 Limitless Blue | Compliance & Analysis Report", title_style))
     story.append(Paragraph("Generated automatically by the Enterprise Document Intelligence Engine.", styles['Normal']))
     story.append(Spacer(1, 15))
     
-    # Financial Vectors Section
+    # Financial Section
     story.append(Paragraph("1. Financial Parameters & Metrics", section_style))
     if financials:
         data = [["Source File", "Extracted Insight Statement"]]
         for src, text in financials:
             data.append([src, Paragraph(text, body_style)])
-        
-        t = Table(data, colWidths=[130, 400])
+        t = Table(data, colWidths=[120, 410])
         t.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1e40af')),
             ('TEXTCOLOR', (0,0), (-1,0), colors.white),
             ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('BOTTOMPADDING', (0,0), (-1,0), 6),
-            ('TOPPADDING', (0,0), (-1,0), 6),
             ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
             ('VALIGN', (0,0), (-1,-1), 'TOP'),
             ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#f8fafc')])
@@ -146,17 +142,14 @@ def generate_pdf_report(financials, risks):
     # Risks Section
     story.append(Paragraph("2. Regulatory & Legal Risk Profile", section_style))
     if risks:
-        data = [["Source File", "Extracted Risk Warning / Flag"]]
+        data = [["Source File", "Extracted Risk Warning"]]
         for src, text in risks:
             data.append([src, Paragraph(text, body_style)])
-            
-        t = Table(data, colWidths=[130, 400])
+        t = Table(data, colWidths=[120, 410])
         t.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#991b1b')),
             ('TEXTCOLOR', (0,0), (-1,0), colors.white),
             ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('BOTTOMPADDING', (0,0), (-1,0), 6),
-            ('TOPPADDING', (0,0), (-1,0), 6),
             ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
             ('VALIGN', (0,0), (-1,-1), 'TOP'),
             ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#fef2f2')])
@@ -183,7 +176,7 @@ if uploaded_file is not None:
                         content = process_single_file(name, z.read(z_info.filename))
                         if content.strip():
                             all_files_data[name] = content
-            st.success(f"Successfully extracted ZIP: {len(all_files_data)} target documents processed.")
+            st.success(f"Successfully extracted and unpacked ZIP archive: {len(all_files_data)} target documents processed.")
         else:
             content = process_single_file(file_name, file_bytes)
             if content.strip():
@@ -192,40 +185,40 @@ if uploaded_file is not None:
 
         combined_financials = []
         combined_risks = []
+        combined_operations = []
 
-        # Complex Regex Patterns capturing critical corporate terminology configurations
-        fin_pattern = re.compile(
-            r'\b(revenue|profit|loss|quarterly|fiscal year|ebitda|capEx|operating cost|annual budget|cash flow|usd|eur|expenses)\b', 
-            re.IGNORECASE
-        )
-        risk_pattern = re.compile(
-            r'\b(non-compliance|regulatory breach|class action|lawsuit|indemnification|liability|intellectual property infringement|termination clause|material adverse effect|dispute resolution)\b', 
-            re.IGNORECASE
-        )
+        fin_pattern = re.compile(r'\b(revenue|profit|loss|quarterly|fiscal year|ebitda|capEx|operating cost|annual budget|cash flow|usd|eur|expenses)\b', re.IGNORECASE)
+        risk_pattern = re.compile(r'\b(non-compliance|regulatory breach|class action|lawsuit|indemnification|liability|intellectual property infringement|termination clause|material adverse effect|dispute resolution)\b', re.IGNORECASE)
+        op_pattern = re.compile(r'\b(protocol|tenet|must|extract|auth|step|schedul|scrub)\b', re.IGNORECASE)
 
         for name, text_content in all_files_data.items():
-            # Splits text safely while ignoring common abbreviations like Corp. or Inc.
             sentences = re.split(r'(?<!\b(?:Corp|Inc|Ltd|vs))\.(?=\s|[A-Z])', text_content)
             for sentence in sentences:
                 clean_sentence = sentence.strip().replace('\n', ' ')
-                if len(clean_sentence) < 15: # Skip fragmented code line elements
+                if len(clean_sentence) < 15:
                     continue
                 if fin_pattern.search(clean_sentence):
                     combined_financials.append((name, clean_sentence))
                 if risk_pattern.search(clean_sentence):
                     combined_risks.append((name, clean_sentence))
+                if op_pattern.search(clean_sentence):
+                    combined_operations.append((name, clean_sentence))
 
-        # 4. Display Extracted Insights UI Elements
-        st.subheader("📊 Document Analysis Insights")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("#### 💵 Financial Vectors")
-            if combined_financials:
-                for src, items in combined_financials[:10]:
-                    st.markdown(f"<div class='metric-box'><b>[{src}]</b> {items}</div>", unsafe_allow_html=True)
-            else:
-                st.info("No primary financial indicators uncovered.")
-                
-        with col2:
-            st.markdown("#### 🚨 Regulatory & Risk Profile")
+        financial_insights = list(set(combined_financials))[:6]
+        risk_insights = list(set(combined_risks))[:6]
+        operational_insights = list(set(combined_operations))[:6]
+
+    except Exception as e:
+        st.error(f"An unexpected data layout extraction fault occurred: {str(e)}")
+        financial_insights, risk_insights, operational_insights = [], [], []
+
+    # 4. Display Extracted Insights UI Elements
+    st.subheader("📋 Executive Intelligence Summary")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### 💵 Financial Metrics & Performance")
+        if financial_insights:
+            for origin, item in financial_insights:
+                st.markdown(f"<div class='metric-box'><b>[FINANCIAL - {origin}]</b> {item}</div>", unsafe_allow_html=True)
+        else:
