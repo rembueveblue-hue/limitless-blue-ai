@@ -222,3 +222,4 @@ if uploaded_file is not None:
             for origin, item in financial_insights:
                 st.markdown(f"<div class='metric-box'><b>[FINANCIAL - {origin}]</b> {item}</div>", unsafe_allow_html=True)
         else:
+        st.warning("Upload files containing valid analytical contexts to enable compilation functions.")
