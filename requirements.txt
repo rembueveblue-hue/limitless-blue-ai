@@ -3,4 +3,4 @@ docx2txt
 streamlit
 reportlab
 python-docx
-
+pandas
