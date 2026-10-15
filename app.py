@@ -2,7 +2,13 @@ import streamlit as st
 from pypdf import PdfReader
 import docx2txt
 import re
+import io
 import pandas as pd
+from docx import Document
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
 
 # 1. Page Configuration & Professional Styling
 st.set_page_config(page_title="Limitless Blue AI", page_icon="🔷", layout="wide")
@@ -76,41 +82,32 @@ if uploaded_file is not None:
         # --- DYNAMIC DASHBOARD OUTPUT ---
         st.subheader("📋 Executive Intelligence Summary")
         
-        summary_text = f"EXECUTIVE SUMMARY REPORT: {uploaded_file.name.upper()}\n"
-        summary_text += "="*50 + "\n\n"
-        
         col1, col2 = st.columns(2)
         
         with col1:
             st.markdown("#### Financial Metrics & Performance")
             if financial_insights:
-                summary_text += "[FINANCIAL INSIGHTS]\n"
                 for item in financial_insights:
                     st.markdown(f"<div class='metric-box'><b>[FINANCIAL]</b> {item}</div>", unsafe_allow_html=True)
-                    summary_text += f"• {item}\n"
             else:
                 st.info("No explicitly isolated financial metrics found.")
                 
             st.markdown("#### Strategic & Operational Directives")
             if operational_insights:
-                summary_text += "\n[OPERATIONAL DIRECTIVES]\n"
                 for item in operational_insights:
                     st.markdown(f"<div class='metric-box'><b>[OPERATIONS]</b> {item}</div>", unsafe_allow_html=True)
-                    summary_text += f"• {item}\n"
             else:
                 st.info("No distinct operational steps detected.")
 
         with col2:
             st.markdown("#### Legal Liabilities & Risk Assessment")
             if risk_insights:
-                summary_text += "\n[LEGAL & RISK ASSESSMENT]\n"
                 for item in risk_insights:
                     st.markdown(f"<div class='risk-box'><b>[CRITICAL RISK]</b> {item}</div>", unsafe_allow_html=True)
-                    summary_text += f"• {item}\n"
             else:
                 st.info("No critical legal compliance flags detected.")
                 
-            # --- FIXED DYNAMIC CHART RESIZING ---
+            # --- DYNAMIC CHART MATRIX ---
             st.markdown("#### Data Extraction Insights Density")
             metric_counts = {
                 "Metrics": ["Financial Elements", "Operational Steps", "Risk Factors"],
@@ -121,13 +118,81 @@ if uploaded_file is not None:
         
         st.markdown("---")
         
-        # --- FIXED TEXT REPORT EXPORT ---
-        st.download_button(
-            label="Export Free Summary Report (.txt)",
-            data=summary_text,
-            file_name=f"Summary_{uploaded_file.name.split('.')[0]}.txt",
-            mime="text/plain"
-        )
+        # --- MULTI-FORMAT ENTERPRISE EXPORT ENGINE HUB ---
+        st.subheader("📥 Export Intelligence Report Hub")
+        format_choice = st.selectbox("Select Export Format Preference:", ["Portable Document Format (.pdf)", "Microsoft Word (.docx)", "Plain Text Document (.txt)"])
         
-    except Exception as e:
-        st.error(f"Error parsing file locally: {e}")
+        def build_txt_report():
+            report = f"LIMITLESS BLUE EXECUTIVE SUMMARY INTEL: {uploaded_file.name.upper()}\n" + "="*50 + "\n\n"
+            report += "[FINANCIAL METRICS]\n" + "\n".join([f"• {f}" for f in financial_insights]) + "\n\n"
+            report += "[OPERATIONAL DIRECTIVES]\n" + "\n".join([f"• {o}" for o in operational_insights]) + "\n\n"
+            report += "[LEGAL RISK ASSESSMENT]\n" + "\n".join([f"• {r}" for r in risk_insights]) + "\n"
+            return report.encode('utf-8')
+
+        def build_docx_report():
+            doc = Document()
+            doc.add_heading(f"Limitless Blue AI | Summary Report", 0)
+            doc.add_paragraph(f"Source Document: {uploaded_file.name}")
+            
+            doc.add_heading("Financial Insights", level=1)
+            for item in financial_insights: doc.add_paragraph(item, style='List Bullet')
+            
+            doc.add_heading("Operational Directives", level=1)
+            for item in operational_insights: doc.add_paragraph(item, style='List Bullet')
+            
+            doc.add_heading("Legal Liabilities & Risks", level=1)
+            for item in risk_insights: doc.add_paragraph(item, style='List Bullet')
+            
+            target_stream = io.BytesIO()
+            doc.save(target_stream)
+            return target_stream.getvalue()
+
+        def build_pdf_report():
+            buffer = io.BytesIO()
+            doc = SimpleDocTemplate(buffer, pagesize=letter, title="Limitless Blue Executive Report")
+            styles = getSampleStyleSheet()
+            
+            body_style = ParagraphStyle('ReportBody', parent=styles['Normal'], fontSize=10, leading=14, textColor=colors.HexColor('#334155'))
+            fin_box_style = ParagraphStyle('FinBoxText', parent=body_style, textColor=colors.HexColor('#1e40af'))
+            risk_box_style = ParagraphStyle('RiskBoxText', parent=body_style, textColor=colors.HexColor('#991b1b'))
+            
+            story = [
+                Paragraph("<font size=24 color='#1d4ed8'><b>🔷 Limitless Blue Intelligence</b></font>", styles['Title']),
+                Paragraph(f"<b>Executive Data Extraction Analysis: {uploaded_file.name}</b>", styles['Normal']),
+                Spacer(1, 15)
+            ]
+            
+            story.append(Paragraph("<font size=14 color='#1e3a8a'><b>💵 Financial & Operational Directives Summary</b></font>", styles['Heading2']))
+            story.append(Spacer(1, 5))
+            for item in financial_insights + operational_insights:
+                p = Paragraph(item, fin_box_style)
+                t = Table([[p]], colWidths=[480]) # FIXED WIDTH DECLARED SAFELY HERE
+                t.setStyle(TableStyle([
+                    ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#eff6ff')),
+                    ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#bfdbfe')),
+                    ('PADDING', (0,0), (-1,-1), 10),
+                ]))
+                story.append(t)
+                story.append(Spacer(1, 8))
+                
+            story.append(Spacer(1, 10))
+            story.append(Paragraph("<font size=14 color='#7f1d1d'><b>🚨 Legal Liability & Compliance Exposure Risks</b></font>", styles['Heading2']))
+            story.append(Spacer(1, 5))
+            for item in risk_insights:
+                p = Paragraph(item, risk_box_style)
+                t = Table([[p]], colWidths=[480]) # FIXED WIDTH DECLARED SAFELY HERE
+                t.setStyle(TableStyle([
+                    ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#fef2f2')),
+                    ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#fecaca')),
+                    ('PADDING', (0,0), (-1,-1), 10),
+                ]))
+                story.append(t)
+                story.append(Spacer(1, 8))
+                
+            doc.build(story)
+            return buffer.getvalue()
+
+        # Dynamic download action mapping
+        if "(.pdf)" in format_choice:
+            st.download_button(label="📥 Download Structured Report (.pdf)", data=build_pdf_report(), file_name=f"Intel_Report_{uploaded_file.name.split('.')[0]}.pdf", mime="application/pdf")
+        elif "(.docx)" in format_choice:
