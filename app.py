@@ -106,7 +106,7 @@ if uploaded_file is not None:
             else:
                 st.info("No critical legal compliance flags detected.")
                 
-            # --- FIXED DYNAMIC CHART ---
+            # --- DYNAMIC CHART ---
             st.markdown("#### Data Extraction Insights Density")
             metric_counts = {
                 "Metrics": ["Financial Elements", "Operational Steps", "Risk Factors"],
@@ -191,3 +191,4 @@ if uploaded_file is not None:
             st.download_button(label="📥 Download Summary Report (.txt)", data=build_txt_report(), file_name=f"Intel_Report_{uploaded_file.name}.txt", mime="text/plain")
 
     except Exception as e:
+        st.error(f"System Parsing Error: {e}")
