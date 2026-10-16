@@ -7,7 +7,7 @@ import pandas as pd
 from docx import Document
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.styles import getSampleStyleSheet
 
 # 1. Page Configuration & Professional Styling
 st.set_page_config(page_title="Limitless Blue AI", page_icon="🔷", layout="wide")
@@ -154,7 +154,6 @@ if uploaded_file is not None:
             pdf_doc = SimpleDocTemplate(output_stream, pagesize=letter, title="Limitless Blue Intel Review")
             styles = getSampleStyleSheet()
             
-            # Simple, standard spacing structure to avoid layout errors
             document_content = [
                 Paragraph("<font size=22 color='#1d4ed8'><b>🔷 Limitless Blue Executive Report</b></font>", styles['Title']),
                 Paragraph(f"<b>Extracted Audit Summary: {uploaded_file.name}</b>", styles['Normal']),
@@ -189,3 +188,6 @@ if uploaded_file is not None:
         elif "(.docx)" in format_choice:
             st.download_button(label="📥 Download Summary Report (.docx)", data=build_docx_report(), file_name=f"Intel_Report_{uploaded_file.name}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
         else:
+            st.download_button(label="📥 Download Summary Report (.txt)", data=build_txt_report(), file_name=f"Intel_Report_{uploaded_file.name}.txt", mime="text/plain")
+
+    except Exception as e:
