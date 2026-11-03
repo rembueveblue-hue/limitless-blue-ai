@@ -35,30 +35,19 @@ st.set_page_config(page_title="Limitless Blue AI", page_icon="🔷", layout="wid
 # FIX: Forcing strict text-color containment (!important) to fix Light/Dark mode bugs
 st.markdown("""
     <style>
-    /* Absolute global theme background lock */
-    html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+    /* Global viewport override to lock down absolute deep dark space */
+    html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"], .main { 
         background-color: #0b111e !important; 
-        color: #ffffff !important;
+        color: #ffffff !important; 
     }
-    .main { background-color: #0b111e !important; color: #ffffff !important; }
     h1 { color: #4e8cff !important; font-family: 'Helvetica Neue', sans-serif; font-weight: 700; }
     h2, h3, h4 { color: #f8fafc !important; }
     p, span, label { color: #94a3b8 !important; }
-    
     .stButton>button { background-color: #1d4ed8; color: white !important; border-radius: 6px; width: 100%; height: 45px; font-weight: bold; border: none; }
     
     /* Strict styling containment for summary insight boxes */
     .metric-box { padding: 14px; background-color: #162238 !important; color: #ffffff !important; border-radius: 8px; margin: 10px 0; border-left: 4px solid #4e8cff; font-size: 14px; line-height: 1.6; }
     .risk-box { padding: 14px; background-color: #2b161d !important; color: #ffffff !important; border-radius: 8px; margin: 10px 0; border-left: 4px solid #ef4444; font-size: 14px; line-height: 1.6; }
-    
-    /* Input layout controls and file uploading fields skin */
-    div[data-testid="stFileUploader"] section {
-        background-color: #162238 !important;
-        border: 1px dashed #4e8cff !important;
-    }
-    div[data-testid="stFileUploader"] label p, div[data-testid="stFileUploader"] span {
-        color: #ffffff !important;
-    }
     
     /* Add smooth breathing room for the mobile export layout zone */
     .export-container { padding-top: 25px; margin-top: 20px; border-top: 1px solid #1e293b; }
@@ -89,27 +78,25 @@ def process_raw_bytes(file_name, file_bytes):
         pass
     return text_content
 
-# Dictionary to hold the files extracted from the loop
-target_documents = {}
+# This will store the text from your uploaded file(s)
+extracted_text = ""
 
 if uploaded_file is not None:
+    file_bytes = uploaded_file.read()
     file_name = uploaded_file.name
-    master_bytes = uploaded_file.read()
     
-    # Clean continuation adding the zip logic directly into the flow
+    # Check if payload requires archive unpacking
     if file_name.lower().endswith(".zip"):
         try:
-            with zipfile.ZipFile(io.BytesIO(master_bytes)) as archive:
-                for member in archive.infolist():
-                    if not member.is_dir():
-                        nested_name = member.filename
-                        nested_ext = nested_name.split(".")[-1].lower()
-                        
-                        if nested_ext in ["pdf", "docx", "txt"]:
-                            with archive.open(member) as nested_file:
-                                nested_bytes = nested_file.read()
-                                target_documents[nested_name] = process_raw_bytes(nested_name, nested_bytes)
+            with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
+                for z_info in z.infolist():
+                    if not z_info.is_dir():
+                        # Extract the bytes of the file inside the zip archive
+                        nested_bytes = z.read(z_info.filename)
+                        # Process individual files and append text to global extraction pool
+                        extracted_text += process_raw_bytes(z_info.filename, nested_bytes) + "\n"
         except Exception as e:
-            st.error(f"Error parsing zip: {e}")
+            st.error(f"Error reading zip file: {e}")
     else:
-        target_documents[file_name] = process_raw_bytes(file_name, master_bytes)
+        # Keep original single standalone document extraction route
+        extracted_text = process_raw_bytes(file_name, file_bytes)
