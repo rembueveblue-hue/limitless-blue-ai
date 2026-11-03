@@ -35,7 +35,7 @@ st.set_page_config(page_title="Limitless Blue AI", page_icon="🔷", layout="wid
 # FIX: Forcing strict text-color containment (!important) to fix Light/Dark mode bugs
 st.markdown("""
     <style>
-    /* Global viewport override to lock down absolute deep dark space */
+    /* Absolute global theme background lock */
     html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"], .main { 
         background-color: #0b111e !important; 
         color: #ffffff !important; 
@@ -91,12 +91,14 @@ if uploaded_file is not None:
             with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
                 for z_info in z.infolist():
                     if not z_info.is_dir():
-                        # Extract the bytes of the file inside the zip archive
+                        # Read raw nested document bytes out of the zip container
                         nested_bytes = z.read(z_info.filename)
-                        # Process individual files and append text to global extraction pool
-                        extracted_text += process_raw_bytes(z_info.filename, nested_bytes) + "\n"
+                        # Route the bytes through your working extraction function
+                        clean_text = process_raw_bytes(z_info.filename, nested_bytes)
+                        # Append it directly to the processing stream
+                        extracted_text += clean_text + "\n"
         except Exception as e:
             st.error(f"Error reading zip file: {e}")
     else:
-        # Keep original single standalone document extraction route
+        # Keep original single standalone document extraction route exactly as it was
         extracted_text = process_raw_bytes(file_name, file_bytes)
