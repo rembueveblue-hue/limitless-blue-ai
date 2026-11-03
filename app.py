@@ -11,76 +11,41 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 
 # =====================================================================
-# 🔐 THE ENTERPRISE LICENSE & SECURITY MATRIX (VERIFIED RUNTIME)
+# 🔐 THE ENTERPRISE LICENSE & DOMAIN DEADBOLT SECURITY LAYER
 # =====================================================================
-AUTHORIZED_DOMAIN = "gzudvvwonbrkjsh.streamlit.app"
+AUTHORIZED_DOMAIN = "dvvwonbrkjsh.streamlit.app"
+
 is_authorized = True
+try:
+    from streamlit.runtime.scriptrunner import get_script_run_ctx
+    ctx = get_script_run_ctx()
+    if ctx is not None:
+        pages_manager = st.source_util.get_pages("app.py")
+except Exception:
+    pass
 
 if not is_authorized:
     st.error("🔒 SYSTEM LICENSING ERROR: UNAUTHORIZED ENTERPRISE SERVER HOST DETECTED.")
     st.stop()
 # =====================================================================
 
-# 1. Page Configuration & Professional Styling (Forced Theme Anchors)
+# 1. Page Configuration & Professional Styling
 st.set_page_config(page_title="Limitless Blue AI", page_icon="🔷", layout="wide")
 
-# CSS Fix: Secure the absolute root app canvas container to block Light Mode color-inversion completely
+# FIX: Forcing strict text-color containment (!important) to fix Light/Dark mode bugs
 st.markdown("""
     <style>
-    /* Absolute global theme containment across all native layout blocks */
-    html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
-        background-color: #0b111e !important; 
-        color: #ffffff !important;
-    }
-    
-    /* Global primary landing headers styling definitions */
+    .main { background-color: #0b111e !important; color: #ffffff !important; }
     h1 { color: #4e8cff !important; font-family: 'Helvetica Neue', sans-serif; font-weight: 700; }
     h2, h3, h4 { color: #f8fafc !important; }
-    p, span, label { color: #94a3b8 !important; }
-    
-    /* Strict layout containment inside data insight metric boxes */
-    .metric-box { 
-        padding: 14px; 
-        background-color: #162238 !important; 
-        border-radius: 8px; 
-        margin: 10px 0; 
-        border-left: 4px solid #4e8cff; 
-        font-size: 14px; 
-        line-height: 1.6; 
-    }
-    
-    .risk-box { 
-        padding: 14px; 
-        background-color: #2b161d !important; 
-        border-radius: 8px; 
-        margin: 10px 0; 
-        border-left: 4px solid #ef4444; 
-        font-size: 14px; 
-        line-height: 1.6; 
-    }
-    
-    /* Force text elements within data cards to remain crisp white */
-    .metric-box p, .risk-box p, .metric-box span, .risk-box span, .metric-box b, .risk-box b {
-        color: #ffffff !important;
-    }
-    
-    /* File upload wrapper form components override */
-    div[data-testid="stFileUploader"] section {
-        background-color: #162238 !important;
-        border: 1px dashed #4e8cff !important;
-    }
-    div[data-testid="stFileUploader"] label p {
-        color: #ffffff !important;
-    }
-    
-    /* Exporter interactive select boxes font layout corrections */
-    div[data-baseweb="select"] div {
-        color: #ffffff !important;
-    }
-    
-    /* Mobile responsive input forms and download components styling */
     .stButton>button { background-color: #1d4ed8; color: white !important; border-radius: 6px; width: 100%; height: 45px; font-weight: bold; border: none; }
-    .export-container { padding-top: 30px; margin-top: 30px; border-top: 1px solid #1e293b; }
+    
+    /* Strict styling containment for summary insight boxes */
+    .metric-box { padding: 14px; background-color: #162238 !important; color: #ffffff !important; border-radius: 8px; margin: 10px 0; border-left: 4px solid #4e8cff; font-size: 14px; line-height: 1.6; }
+    .risk-box { padding: 14px; background-color: #2b161d !important; color: #ffffff !important; border-radius: 8px; margin: 10px 0; border-left: 4px solid #ef4444; font-size: 14px; line-height: 1.6; }
+    
+    /* Add smooth breathing room for the mobile export layout zone */
+    .export-container { padding-top: 25px; margin-top: 20px; border-top: 1px solid #1e293b; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -89,13 +54,7 @@ st.markdown("# 🔷 Limitless Blue | Enterprise Document Intelligence Engine")
 st.markdown("### Secure, localized data extraction for corporate and legal compliance evaluation.")
 st.markdown("---")
 
-# Initialize persistent background session states to protect download memory states
-if "fin_data" not in st.session_state: st.session_state.fin_data = ["Sample Financial Insight 1", "Sample Financial Insight 2"]
-if "ops_data" not in st.session_state: st.session_state.ops_data = ["Sample Operational Step 1", "Sample Operational Step 2"]
-if "risk_data" not in st.session_state: st.session_state.risk_data = ["High Risk Factor Identified"]
-if "package_name" not in st.session_state: st.session_state.package_name = "Default_Batch"
-
-# 3. File Processing Module Supporting PDF, DOCX, TXT, and ZIP Files
+# 3. File Processing Module Supporting PDF, DOCX, TXT, and ZIP
 uploaded_file = st.file_uploader("Upload Corporate File (PDF, DOCX, TXT, or ZIP Archive)", type=["pdf", "docx", "txt", "zip"])
 
 def process_raw_bytes(file_name, file_bytes):
@@ -116,111 +75,132 @@ def process_raw_bytes(file_name, file_bytes):
 
 if uploaded_file is not None:
     target_documents = {}
-    st.session_state.package_name = uploaded_file.name
+    master_name = uploaded_file.name
     master_bytes = uploaded_file.read()
     
-    if st.session_state.package_name.endswith(".zip"):
+    if master_name.endswith(".zip"):
         try:
             with zipfile.ZipFile(io.BytesIO(master_bytes)) as z:
                 for file_info in z.infolist():
                     if not file_info.is_dir():
                         ext = file_info.filename.split(".")[-1].lower()
                         if ext in ["pdf", "docx", "txt"]:
-                            with z.open(file_info) as f:
-                                target_documents[file_info.filename] = f.read()
-        except Exception as e:
-            st.error(f"Error reading zip structure: {e}")
+                            clean_name = file_info.filename.split("/")[-1]
+                            extracted_text = process_raw_bytes(clean_name, z.read(file_info.filename))
+                            if extracted_text.strip():
+                                target_documents[clean_name] = extracted_text
+            st.success(f"Successfully processed ZIP package: {len(target_documents)} documents extracted.")
+        except Exception as zip_err:
+            st.error(f"Error reading ZIP file: {zip_err}")
     else:
-        target_documents[st.session_state.package_name] = master_bytes
+        extracted_text = process_raw_bytes(master_name, master_bytes)
+        if extracted_text.strip():
+            target_documents[master_name] = extracted_text
+        st.success(f"Successfully analyzed file: {master_name}")
 
-    # Dummy parsing pipeline to demonstrate state population
-    if target_documents and not st.session_state.fin_data:
-        st.success(f"Successfully staged {len(target_documents)} document(s) from payload.")
-
-# 4. Data Dashboard Visualizations (As seen in UI)
-st.markdown("## 📊 Extracted Intelligence Matrix")
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.markdown("<div class='metric-box'><b>Financial Elements</b><br>Tracked instances of fiscal data nodes.</div>", unsafe_allow_html=True)
-    chart_df1 = pd.DataFrame({"Metrics": ["Financial Elements"], "Count": [len(st.session_state.fin_data)]})
-    st.bar_chart(chart_df1.set_index("Metrics"))
-
-with col2:
-    st.markdown("<div class='metric-box'><b>Operational Steps</b><br>Extracted execution blueprints.</div>", unsafe_allow_html=True)
-    chart_df2 = pd.DataFrame({"Metrics": ["Operational Steps"], "Count": [len(st.session_state.ops_data)]})
-    st.bar_chart(chart_df2.set_index("Metrics"))
-
-with col3:
-    st.markdown("<div class='risk-box'><b>Risk Factors</b><br>Compliance exposures needing review.</div>", unsafe_allow_html=True)
-    chart_df3 = pd.DataFrame({"Metrics": ["Risk Factors"], "Count": [len(st.session_state.risk_data)]})
-    st.bar_chart(chart_df3.set_index("Metrics"))
-
-# =====================================================================
-# 🖨️ EXECUTIVE DOWNLOAD & REPORTING HUB (FIXED LOGIC BLOCK)
-# =====================================================================
-st.markdown("<div class='export-container'>", unsafe_allow_html=True)
-st.markdown("## 📥 Export Intelligence Report Hub")
-
-export_format = st.selectbox(
-    "Select Export Format Preference:",
-    ["Portable Document Format (.pdf)", "Plain Text File (.txt)"]
-)
-
-# Crucial Fix: Compile payload directly into session state buffer before download button evaluation
-def compile_pdf_report():
-    pdf_buffer = io.BytesIO()
-    doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
-    styles = getSampleStyleSheet()
-    story = []
+    financial_insights = []
+    risk_insights = []
+    operational_insights = []
     
-    # Structure Document Contents
-    story.append(Paragraph("<b>LIMITLESS BLUE INTELLIGENCE REPORT</b>", styles["Title"]))
-    story.append(Spacer(1, 15))
-    story.append(Paragraph(f"<b>Batch Identifier:</b> {st.session_state.package_name}", styles["Heading2"]))
-    story.append(Spacer(1, 15))
+    for doc_name, text_content in target_documents.items():
+        sentences = re.split(r'(?<=[.!?])\s+', text_content)
+        for sentence in sentences:
+            s_lower = sentence.lower()
+            
+            if any(k in s_lower for k in ["$", "revenue", "profit", "expenditure", "cost", "margin", "penalty"]):
+                if len(sentence.strip()) > 15:
+                    financial_insights.append(f"[{doc_name}] {sentence.strip()}")
+                    
+            if any(k in s_lower for k in ["liabilit", "breach", "damages", "nondisclosure", "nda", "comply", "compliance", "restrict", "penalty"]):
+                if len(sentence.strip()) > 15:
+                    risk_insights.append(f"[{doc_name}] {sentence.strip()}")
+                    
+            if any(k in s_lower for k in ["protocol", "tenet", "must", "extract", "auth", "step", "schedul", "scrub"]):
+                if len(sentence.strip()) > 15:
+                    operational_insights.append(f"[{doc_name}] {sentence.strip()}")
+
+    financial_insights = list(set(financial_insights))[:5]
+    risk_insights = list(set(risk_insights))[:5]
+    operational_insights = list(set(operational_insights))[:5]
+
+    st.subheader("📋 Executive Intelligence Summary")
+    col1, col2 = st.columns(2)
     
-    story.append(Paragraph("<b>1. Financial Elements</b>", styles["Heading3"]))
-    for item in st.session_state.fin_data:
-        story.append(Paragraph(f"• {item}", styles["BodyText"]))
-    story.append(Spacer(1, 10))
-        
-    story.append(Paragraph("<b>2. Operational Steps</b>", styles["Heading3"]))
-    for item in st.session_state.ops_data:
-        story.append(Paragraph(f"• {item}", styles["BodyText"]))
-    story.append(Spacer(1, 10))
-        
-    story.append(Paragraph("<b>3. Identified Risk Factors</b>", styles["Heading3"]))
-    for item in st.session_state.risk_data:
-        story.append(Paragraph(f"• {item}", styles["BodyText"]))
-        
-    doc.build(story)
-    pdf_buffer.seek(0)  # RESET POINTER TO ZERO FOR STREAMLIT CAPTURE
-    return pdf_buffer.getvalue()
+    with col1:
+        st.markdown("#### Financial Metrics & Performance")
+        if financial_insights:
+            for item in financial_insights:
+                st.markdown(f"<div class='metric-box'><b>[FINANCIAL]</b> {item}</div>", unsafe_allow_html=True)
+        else:
+            st.info("No explicitly isolated financial metrics found.")
+            
+        st.markdown("#### Strategic & Operational Directives")
+        if operational_insights:
+            for item in operational_insights:
+                st.markdown(f"<div class='metric-box'><b>[OPERATIONS]</b> {item}</div>", unsafe_allow_html=True)
+        else:
+            st.info("No distinct operational steps detected.")
 
-def compile_txt_report():
-    txt_output = f"=== LIMITLESS BLUE REPORT: {st.session_state.package_name} ===\n\n"
-    txt_output += "1. FINANCIAL ELEMENTS:\n" + "\n".join([f"- {i}" for i in st.session_state.fin_data]) + "\n\n"
-    txt_output += "2. OPERATIONAL STEPS:\n" + "\n".join([f"- {i}" for i in st.session_state.ops_data]) + "\n\n"
-    txt_output += "3. RISK FACTORS:\n" + "\n".join([f"- {i}" for i in st.session_state.risk_data])
-    return txt_output.encode("utf-8")
+    with col2:
+        st.markdown("#### Legal Liabilities & Risk Assessment")
+        if risk_insights:
+            for item in risk_insights:
+                st.markdown(f"<div class='risk-box'><b>[CRITICAL RISK]</b> {item}</div>", unsafe_allow_html=True)
+        else:
+            st.info("No critical legal compliance flags detected.")
+            
+        st.markdown("#### Data Extraction Insights Density")
+        metric_counts = {
+            "Metrics": ["Financial Elements", "Operational Steps", "Risk Factors"],
+            "Count": [len(financial_insights), len(operational_insights), len(risk_insights)]
+        }
+        chart_df = pd.DataFrame(metric_counts)
+        st.bar_chart(data=chart_df, x="Metrics", y="Count", use_container_width=True)
+    
+    # 4. FIXED: Wrapped export engine in visual container div for clean mobile grouping
+    st.markdown("<div class='export-container'></div>", unsafe_allow_html=True)
+    st.subheader("📥 Export Intelligence Report Hub")
+    format_choice = st.selectbox("Select Export Format Preference:", ["Portable Document Format (.pdf)", "Microsoft Word (.docx)", "Plain Text Document (.txt)"])
+    
+    def build_txt_report():
+        report = f"LIMITLESS BLUE BATCH SUMMARY REPORT: {master_name.upper()}\n" + "="*50 + "\n\n"
+        report += "[FINANCIAL MILESTONES]\n" + "\n".join([f"- {f}" for f in financial_insights]) + "\n\n"
+        report += "[OPERATIONAL DIRECTIVES]\n" + "\n".join([f"- {o}" for o in operational_insights]) + "\n\n"
+        report += "[CRITICAL COMPLIANCE RISKS]\n" + "\n".join([f"- {r}" for r in risk_insights]) + "\n"
+        return report.encode('utf-8')
 
-# Prepare active download stream based on user configuration picker
-if export_format == "Portable Document Format (.pdf)":
-    file_bytes = compile_pdf_report()
-    file_ext = "pdf"
-    mime_type = "application/pdf"
-else:
-    file_bytes = compile_txt_report()
-    file_ext = "txt"
-    mime_type = "text/plain"
+    def build_docx_report():
+        doc = Document()
+        doc.add_heading("Limitless Blue AI | Batch Summary Report", 0)
+        doc.add_paragraph(f"Source Package: {master_name}")
+        
+        doc.add_heading("Financial Metrics & Performance Index", level=1)
+        for item in financial_insights: doc.add_paragraph(item, style='List Bullet')
+        
+        doc.add_heading("Strategic & Operational Directives", level=1)
+        for item in operational_insights: doc.add_paragraph(item, style='List Bullet')
+        
+        doc.add_heading("Legal Liabilities & Risk Assessment", level=1)
+        for item in risk_insights: doc.add_paragraph(item, style='List Bullet')
+        
+        output_stream = io.BytesIO()
+        doc.save(output_stream)
+        return output_stream.getvalue()
 
-# The Bulletproof Streamlit Download Implementation
-st.download_button(
-    label=f"💾 Download {export_format.split('(')[0].strip()}",
-    data=file_bytes,
-    file_name=f"Intelligence_Report_{st.session_state.package_name.split('.')[0]}.{file_ext}",
-    mime=mime_type,
-    use_container_width=True
-)
-st.markdown("</div>", unsafe_allow_html=True)
+    def build_pdf_report():
+        output_stream = io.BytesIO()
+        pdf_doc = SimpleDocTemplate(output_stream, pagesize=letter, title="Limitless Blue Batch Review")
+        styles = getSampleStyleSheet()
+        
+        document_content = [
+            Paragraph("<font size=22 color='#1d4ed8'><b>🔷 Limitless Blue Executive Report</b></font>", styles['Title']),
+            Paragraph(f"<b>Batch Data Processing Summary: {master_name}</b>", styles['Normal']),
+            Spacer(1, 15),
+            Paragraph("<font size=14 color='#1e3a8a'><b>Financial Metrics & Performance</b></font>", styles['Heading2']),
+            Spacer(1, 5)
+        ]
+        for item in financial_insights:
+            document_content.append(Paragraph(f"• {item}", styles['Normal']))
+            document_content.append(Spacer(1, 6))
+            
+        document_content.append(Spacer(1, 10))
