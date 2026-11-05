@@ -23,7 +23,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Global report builders required for live web deployment downloads
+# Isolated data compilation engine prevents document generation faults on web links
 def build_report(fmt, name, financial, operational, risk):
     if "txt" in fmt:
         rep = f"LIMITLESS BLUE RECAP:\n{name.upper()}\n" + "="*50 + "\n\n"
@@ -34,9 +34,10 @@ def build_report(fmt, name, financial, operational, risk):
     elif "docx" in fmt:
         doc = Document()
         doc.add_heading("Summary Intelligence Report", 0)
-        for t, l in [("Financial Index", financial), ("Operations Index", operational), ("Risk Assessment", risk)]:
-            doc.add_heading(t, level=1)
-            for i in l: doc.add_paragraph(i, style='List Bullet')
+        for title, dataset in [("Financial Index", financial), ("Operations Index", operational), ("Risk Assessment", risk)]:
+            doc.add_heading(title, level=1)
+            for item in dataset: 
+                doc.add_paragraph(item, style='List Bullet')
         out = io.BytesIO()
         doc.save(out)
         return out.getvalue()
@@ -47,7 +48,8 @@ def build_report(fmt, name, financial, operational, risk):
         ctx = [Paragraph("<font size=22 color='#1d4ed8'><b>Limitless Blue Executive Report</b></font>", stls['Title']), Spacer(1, 15)]
         for h, c, l in [("Financial Metrics", "#1e3a8a", financial), ("Operational Directives", "#1e3a8a", operational), ("Critical Risks", "#7f1d1d", risk)]:
             ctx.append(Paragraph(f"<font size=14 color='{c}'><b>{h}</b></font>", stls['Heading2']))
-            for i in l: ctx.append(Paragraph(f"• {i}", stls['Normal']))
+            for item in l: 
+                ctx.append(Paragraph(f"• {item}", stls['Normal']))
             ctx.append(Spacer(1, 10))
         p_doc.build(ctx)
         return out.getvalue()
@@ -58,53 +60,72 @@ st.markdown("---")
 
 uploaded_file = st.file_uploader("Upload Corporate File (PDF, DOCX, TXT, or ZIP)", type=["pdf", "docx", "txt", "zip"])
 
-if "txt" not in st.session_state: st.session_state.txt, st.session_state.fn = "", None
+# Persistent state initialization ensures steady execution loops across user selections
+if "fin" not in st.session_state:
+    st.session_state.fin = []
+    st.session_state.ops = []
+    st.session_state.rsk = []
+    st.session_state.active_fn = None
 
-if uploaded_file and st.session_state.fn != uploaded_file.name:
-    txt, ext = "", uploaded_file.name.split(".")[-1].lower()
-    try:
-        def extract(f_obj, e):
-            if e == "pdf": return "".join([p.extract_text() or "" for p in PdfReader(f_obj).pages])
-            if e == "docx": return docx2txt.process(f_obj)
-            if e == "txt": return f_obj.read().decode("utf-8")
-            return ""
-        
-        if ext == "zip":
-            with zipfile.ZipFile(uploaded_file) as z:
-                for info in z.infolist():
-                    if not info.filename.startswith('__MACOSX/') and not info.is_dir():
-                        with z.open(info) as f: txt += extract(io.BytesIO(f.read()) if info.filename.split(".")[-1].lower() != "txt" else f, info.filename.split(".")[-1].lower()) + "\n"
-        else:
-            txt = extract(uploaded_file, ext)
-        st.session_state.txt, st.session_state.fn = txt, uploaded_file.name
-        st.success(f"Successfully analyzed: {uploaded_file.name}")
-    except Exception as e:
-        st.error(f"Parsing Error: {e}")
-        st.session_state.txt, st.session_state.fn = "", None
+if uploaded_file:
+    if st.session_state.active_fn != uploaded_file.name:
+        txt, ext = "", uploaded_file.name.split(".")[-1].lower()
+        try:
+            def extract(f_obj, e):
+                if e == "pdf": return "".join([p.extract_text() or "" for p in PdfReader(f_obj).pages])
+                if e == "docx": return docx2txt.process(f_obj)
+                if e == "txt": return f_obj.read().decode("utf-8")
+                return ""
+            
+            if ext == "zip":
+                with zipfile.ZipFile(uploaded_file) as z:
+                    for info in z.infolist():
+                        if not info.filename.startswith('__MACOSX/') and not info.is_dir():
+                            inner_ext = info.filename.split(".")[-1].lower()
+                            with z.open(info) as f: 
+                                txt += extract(io.BytesIO(f.read()) if inner_ext != "txt" else f, inner_ext) + "\n"
+            else:
+                txt = extract(uploaded_file, ext)
+                
+            if txt.strip():
+                sentences = re.split(r'(?<=[\.!?])\s+', txt)
+                st.session_state.fin = list(set([s.strip() for s in sentences if any(k in s.lower() for k in ["$", "revenue", "profit", "expenditure", "cost", "margin", "penalty"]) and len(s.strip()) > 15]))[:5]
+                st.session_state.rsk = list(set([s.strip() for s in sentences if any(k in s.lower() for k in ["liabilit", "breach", "damages", "nondisclosure", "nda", "comply", "compliance", "restrict", "penalty"]) and len(s.strip()) > 15]))[:5]
+                st.session_state.ops = list(set([s.strip() for s in sentences if any(k in s.lower() for k in ["protocol", "tenet", "must", "extract", "auth", "step", "schedul", "scrub"]) and len(s.strip()) > 15]))[:5]
+                st.session_state.active_fn = uploaded_file.name
+                st.success(f"Successfully analyzed: {uploaded_file.name}")
+            else:
+                st.warning("No readable text discovered in file contents.")
+                st.session_state.active_fn = None
+        except Exception as e:
+            st.error(f"Parsing Error: {e}")
+            st.session_state.active_fn = None
 
-if st.session_state.txt:
-    sentences = re.split(r'(?<=[\.!?])\s+', st.session_state.txt)
-    financial = list(set([s.strip() for s in sentences if any(k in s.lower() for k in ["$", "revenue", "profit", "expenditure", "cost", "margin", "penalty"]) and len(s.strip()) > 15]))[:5]
-    risk = list(set([s.strip() for s in sentences if any(k in s.lower() for k in ["liabilit", "breach", "damages", "nondisclosure", "nda", "comply", "compliance", "restrict", "penalty"]) and len(s.strip()) > 15]))[:5]
-    operational = list(set([s.strip() for s in sentences if any(k in s.lower() for k in ["protocol", "tenet", "must", "extract", "auth", "step", "schedul", "scrub"]) and len(s.strip()) > 15]))[:5]
-    
-    st.subheader("📋 Executive Intelligence Summary")
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown("#### Financial Metrics & Performance")
-        for i in financial: st.markdown(f"<div class='metric-box'><b>[FINANCIAL]</b> {i}</div>", unsafe_allow_html=True)
-        st.markdown("#### Strategic & Operational Directives")
-        for i in operational: st.markdown(f"<div class='metric-box'><b>[OPERATIONS]</b> {i}</div>", unsafe_allow_html=True)
-    with c2:
-        st.markdown("#### Legal Liabilities & Risk Assessment")
-        for i in risk: st.markdown(f"<div class='risk-box'><b>[CRITICAL RISK]</b> {i}</div>", unsafe_allow_html=True)
+    # Steady UI layout draws from cached computations without repeating extract sweeps
+    if st.session_state.active_fn:
+        st.subheader("📋 Executive Intelligence Summary")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("#### Financial Metrics & Performance")
+            for i in st.session_state.fin: st.markdown(f"<div class='metric-box'><b>[FINANCIAL]</b> {i}</div>", unsafe_allow_html=True)
+            st.markdown("#### Strategic & Operational Directives")
+            for i in st.session_state.ops: st.markdown(f"<div class='metric-box'><b>[OPERATIONS]</b> {i}</div>", unsafe_allow_html=True)
+        with c2:
+            st.markdown("#### Legal Liabilities & Risk Assessment")
+            for i in st.session_state.rsk: st.markdown(f"<div class='risk-box'><b>[CRITICAL RISK]</b> {i}</div>", unsafe_allow_html=True)
+            
+        st.bar_chart(pd.DataFrame({"Metrics": ["Financial", "Operational", "Risk"], "Count": [len(st.session_state.fin), len(st.session_state.ops), len(st.session_state.rsk)]}), x="Metrics", y="Count", use_container_width=True)
+        st.markdown("---")
         
-    st.bar_chart(pd.DataFrame({"Metrics": ["Financial", "Operational", "Risk"], "Count": [len(financial), len(operational), len(risk)]}), x="Metrics", y="Count", use_container_width=True)
-    st.markdown("---")
-    
-    st.subheader("📥 Export Intelligence Report Hub")
-    fmt = st.selectbox("Select Export Format Preference:", ["Portable Document Format (.pdf)", "Microsoft Word (.docx)", "Plain Text Document (.txt)"])
-    ext_m = "pdf" if "pdf" in fmt else "docx" if "docx" in fmt else "txt"
-    st.download_button(label=f"📥 Download Summary Report (.{ext_m})", data=build_report(ext_m, st.session_state.fn, financial, operational, risk), file_name=f"Intel_Report_{st.session_state.fn}.{ext_m}", mime=f"application/{ext_m}" if ext_m != "txt" else "text/plain")
+        st.subheader("📥 Export Intelligence Report Hub")
+        fmt = st.selectbox("Select Export Format Preference:", ["Portable Document Format (.pdf)", "Microsoft Word (.docx)", "Plain Text Document (.txt)"])
+        ext_m = "pdf" if "pdf" in fmt else "docx" if "docx" in fmt else "txt"
+        
+        st.download_button(
+            label=f"📥 Download Summary Report (.{ext_m})", 
+            data=build_report(ext_m, st.session_state.active_fn, st.session_state.fin, st.session_state.ops, st.session_state.rsk), 
+            file_name=f"Intel_Report_{st.session_state.active_fn}.{ext_m}", 
+            mime=f"application/{ext_m}" if ext_m != "txt" else "text/plain"
+        )
 else:
-    st.session_state.txt, st.session_state.fn = "", None
+    st.session_state.fin, st.session_state.ops, st.session_state.rsk, st.session_state.active_fn = [], [], [], None
