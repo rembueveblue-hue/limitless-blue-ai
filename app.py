@@ -10,6 +10,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 import zipfile
 
+# # 1. Page Configuration & Professional Styling
 st.set_page_config(
     page_title="Limitless Blue AI", page_icon="🔷", 
     layout="wide"
@@ -26,24 +27,77 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# # 2. GLOBAL DOCUMENT CONSTRUCTION HELPER ENGINES
+def build_txt_report(filename, financial, operational, risk):
+    report = f"LIMITLESS BLUE EXECUTIVE INTEL RECAP:\n{filename.upper()}\n" + "="*50 + "\n\n"
+    report += "[FINANCIAL MILESTONES]\n" + "\n".join([f"- {f}" for f in financial]) + "\n\n"
+    report += "[OPERATIONAL DIRECTIVES]\n" + "\n".join([f"- {o}" for o in operational]) + "\n\n"
+    report += "[CRITICAL COMPLIANCE RISKS]\n" + "\n".join([f"- {r}" for r in risk]) + "\n"
+    return report.encode('utf-8')
+    
+def build_docx_report(filename, financial, operational, risk):
+    doc = Document()
+    doc.add_heading("Limitless Blue AI | Summary Intelligence Report", 0)
+    doc.add_paragraph(f"Analyzed File Reference: {filename}")
+    doc.add_heading("Financial Metrics & Performance Index", level=1)
+    for item in financial:
+        doc.add_paragraph(item, style='List Bullet')
+    doc.add_heading("Strategic & Operational Directives", level=1)
+    for item in operational:
+        doc.add_paragraph(item, style='List Bullet')
+    doc.add_heading("Legal Liabilities & Risk Assessment", level=1)
+    for item in risk:
+        doc.add_paragraph(item, style='List Bullet')
+    output_stream = io.BytesIO()
+    doc.save(output_stream)
+    return output_stream.getvalue()
+    
+def build_pdf_report(filename, financial, operational, risk):
+    output_stream = io.BytesIO()
+    pdf_doc = SimpleDocTemplate(output_stream, pagesize=letter, title="Limitless Blue Intel Review")
+    styles = getSampleStyleSheet()
+    document_content = [
+        Paragraph("<font size=22 color='#1d4ed8'><b>Limitless Blue Executive Report</b></font>", styles['Title']),
+        Paragraph(f"<b>Extracted Audit Summary:</b> {filename}", styles['Normal']),
+        Spacer(1, 15),
+        Paragraph("<font size=14 color='#1e3a8a'><b>Financial Metrics & Performance</b></font>", styles['Heading2']),
+        Spacer(1, 5)
+    ]
+    for item in financial:
+        document_content.append(Paragraph(f"• {item}", styles['Normal']))
+        document_content.append(Spacer(1, 6))
+    document_content.append(Spacer(1, 10))
+    document_content.append(Paragraph("<font size=14 color='#1e3a8a'><b>Strategic & Operational Directives</b></font>", styles['Heading2']))
+    document_content.append(Spacer(1, 5))
+    for item in operational:
+        document_content.append(Paragraph(f"• {item}", styles['Normal']))
+        document_content.append(Spacer(1, 6))
+    document_content.append(Spacer(1, 10))
+    document_content.append(Paragraph("<font size=14 color='#7f1d1d'><b>Legal Liabilities & Critical Compliance Risks</b></font>", styles['Heading2']))
+    document_content.append(Spacer(1, 5))
+    for item in risk:
+        document_content.append(Paragraph(f"• {item}", styles['Normal']))
+        document_content.append(Spacer(1, 6))
+    pdf_doc.build(document_content)
+    return output_stream.getvalue()
+
+# # 3. Executive Header Layout
 st.markdown("# 🔷 Limitless Blue | Enterprise Document Intelligence Engine")
 st.markdown("### Secure, localized data extraction for corporate and legal compliance evaluation.")
 st.markdown("---")
 
-# Added "zip" format to the file uploader list safely
 uploaded_file = st.file_uploader(
     "Upload Corporate File (PDF, DOCX, TXT, or ZIP)", 
     type=["pdf", "docx", "txt", "zip"]
 )
 
-# Persistent session state cache prevents file pointer loss upon button click reruns
+# Initialize unique session states to store analytics persistently during format selection switches
 if "saved_text" not in st.session_state:
     st.session_state.saved_text = ""
 if "saved_file_name" not in st.session_state:
     st.session_state.saved_file_name = None
 
 if uploaded_file is not None:
-    # Run the parsing logic only if a new file event occurs
     if st.session_state.saved_file_name != uploaded_file.name:
         text_content = ""
         file_type = uploaded_file.name.split(".")[-1].lower()
@@ -58,7 +112,6 @@ if uploaded_file is not None:
             elif file_type == "txt":
                 text_content = uploaded_file.read().decode("utf-8")
             elif file_type == "zip":
-                # Clean, independent sub-loop to unpack zip files safely without altering single-file streams
                 with zipfile.ZipFile(uploaded_file) as z:
                     for file_info in z.infolist():
                         if file_info.filename.startswith('__MACOSX/') or file_info.is_dir():
@@ -84,7 +137,6 @@ if uploaded_file is not None:
             st.session_state.saved_text = ""
             st.session_state.saved_file_name = None
 
-    # Run data analytics block if valid cached text data is available
     if st.session_state.saved_text:
         sentences = re.split(r'(?<=[\.!?])\s+', st.session_state.saved_text)
         financial_insights = []
@@ -145,48 +197,4 @@ if uploaded_file is not None:
         st.bar_chart(data=chart_df, x="Metrics", y="Count", use_container_width=True)
         st.markdown("---")
         
-        st.subheader("📥 Export Intelligence Report Hub")
-        format_choice = st.selectbox(
-            "Select Export Format Preference:", 
-            ["Portable Document Format (.pdf)", "Microsoft Word (.docx)", "Plain Text Document (.txt)"]
-        )
-        
-        def build_txt_report():
-            report = f"LIMITLESS BLUE EXECUTIVE INTEL RECAP:\\n{st.session_state.saved_file_name.upper()}\\n" + "="*50 + "\\n\\n"
-            report += "[FINANCIAL MILESTONES]\\n" + "\\n".join([f"- {f}" for f in financial_insights]) + "\\n\\n"
-            report += "[OPERATIONAL DIRECTIVES]\\n" + "\\n".join([f"- {o}" for o in operational_insights]) + "\\n\\n"
-            report += "[CRITICAL COMPLIANCE RISKS]\\n" + "\\n".join([f"- {r}" for r in risk_insights]) + "\\n"
-            return report.encode('utf-8')
-            
-        def build_docx_report():
-            doc = Document()
-            doc.add_heading("Limitless Blue AI | Summary Intelligence Report", 0)
-            doc.add_paragraph(f"Analyzed File Reference: {st.session_state.saved_file_name}")
-            doc.add_heading("Financial Metrics & Performance Index", level=1)
-            for item in financial_insights:
-                doc.add_paragraph(item, style='List Bullet')
-            doc.add_heading("Strategic & Operational Directives", level=1)
-            for item in operational_insights:
-                doc.add_paragraph(item, style='List Bullet')
-            doc.add_heading("Legal Liabilities & Risk Assessment", level=1)
-            for item in risk_insights:
-                doc.add_paragraph(item, style='List Bullet')
-            output_stream = io.BytesIO()
-            doc.save(output_stream)
-            return output_stream.getvalue()
-            
-        def build_pdf_report():
-            output_stream = io.BytesIO()
-            pdf_doc = SimpleDocTemplate(output_stream, pagesize=letter, title="Limitless Blue Intel Review")
-            styles = getSampleStyleSheet()
-            document_content = [
-                Paragraph("<font size=22 color='#1d4ed8'><b>🔷 Limitless Blue Executive Report</b></font>", styles['Title']),
-                Paragraph(f"<b>Extracted Audit Summary:</b> {st.session_state.saved_file_name}", styles['Normal']),
-                Spacer(1, 15),
-                Paragraph("<font size=14 color='#1e3a8a'><b>Financial Metrics & Performance</b></font>", styles['Heading2']),
-                Spacer(1, 5)
-            ]
-            for item in financial_insights:
-                document_content.append(Paragraph(f"• {item}", styles['Normal']))
-                document_content.append(Spacer(1, 6))
-            document_content.append(Spacer(1, 10))
+        # # 4. Multi-Format Export Module Hub
