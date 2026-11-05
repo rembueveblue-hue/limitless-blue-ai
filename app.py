@@ -84,7 +84,6 @@ def build_pdf_report(filename, financial, operational, risk):
 # --- ISOLATED SPLIT FUNCTION CHANNELS ---
 
 def process_single_file(file_obj, ext):
-    """Processes standalone document streams with original working structure."""
     text = ""
     if ext == "pdf":
         reader = PdfReader(file_obj)
@@ -94,11 +93,10 @@ def process_single_file(file_obj, ext):
         text = docx2txt.process(file_obj)
     elif ext == "txt":
         text = file_obj.read().decode("utf-8")
-        file_obj.seek(0)  # Immediately release byte track pointer
+        file_obj.seek(0)
     return text
 
 def process_zip_file(zip_obj):
-    """Processes file layers safely extracted from a zip container."""
     combined_text = []
     with zipfile.ZipFile(zip_obj) as z:
         for file_info in z.infolist():
@@ -122,7 +120,6 @@ def process_zip_file(zip_obj):
                     combined_text.append("\n".join(inner_docx_text))
     return "\n".join(combined_text)
 
-
 # # 3. Executive Header Layout
 st.markdown("# 🔷 Limitless Blue | Enterprise Document Intelligence Engine")
 st.markdown("### Secure, localized data extraction for corporate and legal compliance evaluation.")
@@ -133,28 +130,30 @@ uploaded_file = st.file_uploader(
     type=["pdf", "docx", "txt", "zip"]
 )
 
-if uploaded_file is not None:
-    text_content = ""
-    file_type = uploaded_file.name.split(".")[-1].lower()
-    
-    try:
-        # Route file evaluation through split path logic
-        if file_type == "zip":
-            text_content = process_zip_file(uploaded_file)
-        else:
-            text_content = process_single_file(uploaded_file, file_type)
-            
-        if text_content.strip():
-            st.success(f"Successfully analyzed: {uploaded_file.name}")
-        else:
-            st.warning("No readable text content found inside the file.")
-            
-    except Exception as e:
-        st.error(f"System Parsing Error: {e}")
-        text_content = ""
+# Initialize unique session states to store analytics persistently during selectbox updates
+if "active_text" not in st.session_state:
+    st.session_state.active_text = ""
+    st.session_state.last_file = None
 
-    if text_content.strip():
-        sentences = re.split(r'(?<=[\.!?])\s+', text_content)
+if uploaded_file is not None:
+    # Read files only if it's a completely new upload event
+    if st.session_state.last_file != uploaded_file.name:
+        file_type = uploaded_file.name.split(".")[-1].lower()
+        try:
+            if file_type == "zip":
+                st.session_state.active_text = process_zip_file(uploaded_file)
+            else:
+                st.session_state.active_text = process_single_file(uploaded_file, file_type)
+            st.session_state.last_file = uploaded_file.name
+        except Exception as e:
+            st.error(f"System Parsing Error: {e}")
+            st.session_state.active_text = ""
+            st.session_state.last_file = None
+
+    if st.session_state.active_text.strip():
+        st.success(f"Successfully analyzed: {uploaded_file.name}")
+        
+        sentences = re.split(r'(?<=[\.!?])\s+', st.session_state.active_text)
         financial_insights = []
         risk_insights = []
         operational_insights = []
@@ -210,6 +209,3 @@ if uploaded_file is not None:
             "Count": [len(financial_insights), len(operational_insights), len(risk_insights)]
         }
         chart_df = pd.DataFrame(metric_counts)
-        st.bar_chart(data=chart_df, x="Metrics", y="Count", use_container_width=True)
-        st.markdown("---")
-        
