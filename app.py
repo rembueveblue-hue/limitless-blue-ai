@@ -10,6 +10,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 import zipfile
 
+# # 1. Page Configuration & Professional Styling
 st.set_page_config(
     page_title="Limitless Blue AI", page_icon="🔷", 
     layout="wide"
@@ -26,6 +27,61 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# # 2. Document Construction Helper Engines (Isolated from layout reruns)
+def build_txt_report(filename, financial, operational, risk):
+    report = f"LIMITLESS BLUE EXECUTIVE INTEL RECAP:\n{filename.upper()}\n" + "="*50 + "\n\n"
+    report += "[FINANCIAL MILESTONES]\n" + "\n".join([f"- {f}" for f in financial]) + "\n\n"
+    report += "[OPERATIONAL DIRECTIVES]\n" + "\n".join([f"- {o}" for o in operational]) + "\n\n"
+    report += "[CRITICAL COMPLIANCE RISKS]\n" + "\n".join([f"- {r}" for r in risk]) + "\n"
+    return report.encode('utf-8')
+    
+def build_docx_report(filename, financial, operational, risk):
+    doc = Document()
+    doc.add_heading("Limitless Blue AI | Summary Intelligence Report", 0)
+    doc.add_paragraph(f"Analyzed File Reference: {filename}")
+    doc.add_heading("Financial Metrics & Performance Index", level=1)
+    for item in financial:
+        doc.add_paragraph(item, style='List Bullet')
+    doc.add_heading("Strategic & Operational Directives", level=1)
+    for item in operational:
+        doc.add_paragraph(item, style='List Bullet')
+    doc.add_heading("Legal Liabilities & Risk Assessment", level=1)
+    for item in risk:
+        doc.add_paragraph(item, style='List Bullet')
+    output_stream = io.BytesIO()
+    doc.save(output_stream)
+    return output_stream.getvalue()
+    
+def build_pdf_report(filename, financial, operational, risk):
+    output_stream = io.BytesIO()
+    pdf_doc = SimpleDocTemplate(output_stream, pagesize=letter, title="Limitless Blue Intel Review")
+    styles = getSampleStyleSheet()
+    document_content = [
+        Paragraph("<font size=22 color='#1d4ed8'><b>🔷 Limitless Blue Executive Report</b></font>", styles['Title']),
+        Paragraph(f"<b>Extracted Audit Summary:</b> {filename}", styles['Normal']),
+        Spacer(1, 15),
+        Paragraph("<font size=14 color='#1e3a8a'><b>Financial Metrics & Performance</b></font>", styles['Heading2']),
+        Spacer(1, 5)
+    ]
+    for item in financial:
+        document_content.append(Paragraph(f"• {item}", styles['Normal']))
+        document_content.append(Spacer(1, 6))
+    document_content.append(Spacer(1, 10))
+    document_content.append(Paragraph("<font size=14 color='#1e3a8a'><b>Strategic & Operational Directives</b></font>", styles['Heading2']))
+    document_content.append(Spacer(1, 5))
+    for item in operational:
+        document_content.append(Paragraph(f"• {item}", styles['Normal']))
+        document_content.append(Spacer(1, 6))
+    document_content.append(Spacer(1, 10))
+    document_content.append(Paragraph("<font size=14 color='#7f1d1d'><b>Legal Liabilities & Critical Compliance Risks</b></font>", styles['Heading2']))
+    document_content.append(Spacer(1, 5))
+    for item in risk:
+        document_content.append(Paragraph(f"• {item}", styles['Normal']))
+        document_content.append(Spacer(1, 6))
+    pdf_doc.build(document_content)
+    return output_stream.getvalue()
+
+# # 3. Executive Header Layout
 st.markdown("# 🔷 Limitless Blue | Enterprise Document Intelligence Engine")
 st.markdown("### Secure, localized data extraction for corporate and legal compliance evaluation.")
 st.markdown("---")
@@ -135,62 +191,13 @@ if uploaded_file is not None:
         st.bar_chart(data=chart_df, x="Metrics", y="Count", use_container_width=True)
         st.markdown("---")
         
+        # # 4. Multi-Format Export Module Hub
         st.subheader("📥 Export Intelligence Report Hub")
         format_choice = st.selectbox(
             "Select Export Format Preference:", 
             ["Portable Document Format (.pdf)", "Microsoft Word (.docx)", "Plain Text Document (.txt)"]
         )
         
-        def build_txt_report():
-            report = f"LIMITLESS BLUE EXECUTIVE INTEL RECAP:\n{uploaded_file.name.upper()}\n" + "="*50 + "\n\n"
-            report += "[FINANCIAL MILESTONES]\n" + "\n".join([f"- {f}" for f in financial_insights]) + "\n\n"
-            report += "[OPERATIONAL DIRECTIVES]\n" + "\n".join([f"- {o}" for o in operational_insights]) + "\n\n"
-            report += "[CRITICAL COMPLIANCE RISKS]\n" + "\n".join([f"- {r}" for r in risk_insights]) + "\n"
-            return report.encode('utf-8')
-            
-        def build_docx_report():
-            doc = Document()
-            doc.add_heading("Limitless Blue AI | Summary Intelligence Report", 0)
-            doc.add_paragraph(f"Analyzed File Reference: {uploaded_file.name}")
-            doc.add_heading("Financial Metrics & Performance Index", level=1)
-            for item in financial_insights:
-                doc.add_paragraph(item, style='List Bullet')
-            doc.add_heading("Strategic & Operational Directives", level=1)
-            for item in operational_insights:
-                doc.add_paragraph(item, style='List Bullet')
-            doc.add_heading("Legal Liabilities & Risk Assessment", level=1)
-            for item in risk_insights:
-                doc.add_paragraph(item, style='List Bullet')
-            output_stream = io.BytesIO()
-            doc.save(output_stream)
-            return output_stream.getvalue()
-            
-        def build_pdf_report():
-            output_stream = io.BytesIO()
-            pdf_doc = SimpleDocTemplate(output_stream, pagesize=letter, title="Limitless Blue Intel Review")
-            styles = getSampleStyleSheet()
-            document_content = [
-                Paragraph("<font size=22 color='#1d4ed8'><b>🔷 Limitless Blue Executive Report</b></font>", styles['Title']),
-                Paragraph(f"<b>Extracted Audit Summary:</b> {uploaded_file.name}", styles['Normal']),
-                Spacer(1, 15),
-                Paragraph("<font size=14 color='#1e3a8a'><b>Financial Metrics & Performance</b></font>", styles['Heading2']),
-                Spacer(1, 5)
-            ]
-            for item in financial_insights:
-                document_content.append(Paragraph(f"• {item}", styles['Normal']))
-                document_content.append(Spacer(1, 6))
-            document_content.append(Spacer(1, 10))
-            document_content.append(Paragraph("<font size=14 color='#1e3a8a'><b>Strategic & Operational Directives</b></font>", styles['Heading2']))
-            document_content.append(Spacer(1, 5))
-            for item in operational_insights:
-                document_content.append(Paragraph(f"• {item}", styles['Normal']))
-                document_content.append(Spacer(1, 6))
-            document_content.append(Spacer(1, 10))
-            document_content.append(Paragraph("<font size=14 color='#7f1d1d'><b>Legal Liabilities & Critical Compliance Risks</b></font>", styles['Heading2']))
-            document_content.append(Spacer(1, 5))
-            for item in risk_insights:
-                document_content.append(Paragraph(f"• {item}", styles['Normal']))
-                document_content.append(Spacer(1, 6))
-            pdf_doc.build(document_content)
-            return output_stream.getvalue()
-            
+        if "(.pdf)" in format_choice:
+            st.download_button(
+                label="📥 Download Summary Report (.pdf)", 
