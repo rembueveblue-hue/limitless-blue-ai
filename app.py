@@ -8,6 +8,7 @@ from docx import Document
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
+import zipfile
 
 st.set_page_config(
     page_title="Limitless Blue AI", page_icon="🔷", 
@@ -29,31 +30,63 @@ st.markdown("# 🔷 Limitless Blue | Enterprise Document Intelligence Engine")
 st.markdown("### Secure, localized data extraction for corporate and legal compliance evaluation.")
 st.markdown("---")
 
+# Added "zip" format to the file uploader list safely
 uploaded_file = st.file_uploader(
-    "Upload Corporate File (PDF, DOCX, or TXT)", 
-    type=["pdf", "docx", "txt"]
+    "Upload Corporate File (PDF, DOCX, TXT, or ZIP)", 
+    type=["pdf", "docx", "txt", "zip"]
 )
 
-if uploaded_file is not None:
-    text_content = ""
-    file_type = uploaded_file.name.split(".")[-1].lower()
-    
-    try:
-        if file_type == "pdf":
-            reader = PdfReader(uploaded_file)
-            for page in reader.pages:
-                text_content += page.extract_text() or ""
-        elif file_type == "docx":
-            text_content = docx2txt.process(uploaded_file)
-        elif file_type == "txt":
-            text_content = uploaded_file.read().decode("utf-8")
-        st.success(f"Successfully analyzed: {uploaded_file.name}")
-    except Exception as e:
-        st.error(f"System Parsing Error: {e}")
-        text_content = ""
+# Persistent session state cache prevents file pointer loss upon button click reruns
+if "saved_text" not in st.session_state:
+    st.session_state.saved_text = ""
+if "saved_file_name" not in st.session_state:
+    st.session_state.saved_file_name = None
 
-    if text_content:
-        sentences = re.split(r'(?<=[\.!?])\s+', text_content)
+if uploaded_file is not None:
+    # Run the parsing logic only if a new file event occurs
+    if st.session_state.saved_file_name != uploaded_file.name:
+        text_content = ""
+        file_type = uploaded_file.name.split(".")[-1].lower()
+        
+        try:
+            if file_type == "pdf":
+                reader = PdfReader(uploaded_file)
+                for page in reader.pages:
+                    text_content += page.extract_text() or ""
+            elif file_type == "docx":
+                text_content = docx2txt.process(uploaded_file)
+            elif file_type == "txt":
+                text_content = uploaded_file.read().decode("utf-8")
+            elif file_type == "zip":
+                # Clean, independent sub-loop to unpack zip files safely without altering single-file streams
+                with zipfile.ZipFile(uploaded_file) as z:
+                    for file_info in z.infolist():
+                        if file_info.filename.startswith('__MACOSX/') or file_info.is_dir():
+                            continue
+                        inner_ext = file_info.filename.split(".")[-1].lower()
+                        with z.open(file_info) as f:
+                            if inner_ext == "txt":
+                                text_content += f.read().decode("utf-8") + "\n"
+                            elif inner_ext == "pdf":
+                                pdf_bytes = io.BytesIO(f.read())
+                                reader = PdfReader(pdf_bytes)
+                                for page in reader.pages:
+                                    text_content += page.extract_text() or ""
+                            elif inner_ext == "docx":
+                                docx_bytes = io.BytesIO(f.read())
+                                text_content += docx2txt.process(docx_bytes) + "\n"
+                                
+            st.session_state.saved_text = text_content
+            st.session_state.saved_file_name = uploaded_file.name
+            st.success(f"Successfully analyzed: {uploaded_file.name}")
+        except Exception as e:
+            st.error(f"System Parsing Error: {e}")
+            st.session_state.saved_text = ""
+            st.session_state.saved_file_name = None
+
+    # Run data analytics block if valid cached text data is available
+    if st.session_state.saved_text:
+        sentences = re.split(r'(?<=[\.!?])\s+', st.session_state.saved_text)
         financial_insights = []
         risk_insights = []
         operational_insights = []
@@ -119,7 +152,7 @@ if uploaded_file is not None:
         )
         
         def build_txt_report():
-            report = f"LIMITLESS BLUE EXECUTIVE INTEL RECAP:\\n{uploaded_file.name.upper()}\\n" + "="*50 + "\\n\\n"
+            report = f"LIMITLESS BLUE EXECUTIVE INTEL RECAP:\\n{st.session_state.saved_file_name.upper()}\\n" + "="*50 + "\\n\\n"
             report += "[FINANCIAL MILESTONES]\\n" + "\\n".join([f"- {f}" for f in financial_insights]) + "\\n\\n"
             report += "[OPERATIONAL DIRECTIVES]\\n" + "\\n".join([f"- {o}" for o in operational_insights]) + "\\n\\n"
             report += "[CRITICAL COMPLIANCE RISKS]\\n" + "\\n".join([f"- {r}" for r in risk_insights]) + "\\n"
@@ -128,7 +161,7 @@ if uploaded_file is not None:
         def build_docx_report():
             doc = Document()
             doc.add_heading("Limitless Blue AI | Summary Intelligence Report", 0)
-            doc.add_paragraph(f"Analyzed File Reference: {uploaded_file.name}")
+            doc.add_paragraph(f"Analyzed File Reference: {st.session_state.saved_file_name}")
             doc.add_heading("Financial Metrics & Performance Index", level=1)
             for item in financial_insights:
                 doc.add_paragraph(item, style='List Bullet')
@@ -148,7 +181,7 @@ if uploaded_file is not None:
             styles = getSampleStyleSheet()
             document_content = [
                 Paragraph("<font size=22 color='#1d4ed8'><b>🔷 Limitless Blue Executive Report</b></font>", styles['Title']),
-                Paragraph(f"<b>Extracted Audit Summary:</b> {uploaded_file.name}", styles['Normal']),
+                Paragraph(f"<b>Extracted Audit Summary:</b> {st.session_state.saved_file_name}", styles['Normal']),
                 Spacer(1, 15),
                 Paragraph("<font size=14 color='#1e3a8a'><b>Financial Metrics & Performance</b></font>", styles['Heading2']),
                 Spacer(1, 5)
@@ -157,38 +190,3 @@ if uploaded_file is not None:
                 document_content.append(Paragraph(f"• {item}", styles['Normal']))
                 document_content.append(Spacer(1, 6))
             document_content.append(Spacer(1, 10))
-            document_content.append(Paragraph("<font size=14 color='#1e3a8a'><b>Strategic & Operational Directives</b></font>", styles['Heading2']))
-            document_content.append(Spacer(1, 5))
-            for item in operational_insights:
-                document_content.append(Paragraph(f"• {item}", styles['Normal']))
-                document_content.append(Spacer(1, 6))
-            document_content.append(Spacer(1, 10))
-            document_content.append(Paragraph("<font size=14 color='#7f1d1d'><b>Legal Liabilities & Critical Compliance Risks</b></font>", styles['Heading2']))
-            document_content.append(Spacer(1, 5))
-            for item in risk_insights:
-                document_content.append(Paragraph(f"• {item}", styles['Normal']))
-                document_content.append(Spacer(1, 6))
-            pdf_doc.build(document_content)
-            return output_stream.getvalue()
-            
-        if "(.pdf)" in format_choice:
-            st.download_button(
-                label="📥 Download Summary Report (.pdf)", 
-                data=build_pdf_report(), 
-                file_name=f"Intel_Report_{uploaded_file.name}.pdf", 
-                mime="application/pdf"
-            )
-        elif "(.docx)" in format_choice:
-            st.download_button(
-                label="📥 Download Summary Report (.docx)", 
-                data=build_docx_report(), 
-                file_name=f"Intel_Report_{uploaded_file.name}.docx", 
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            )
-        else:
-            st.download_button(
-                label="📥 Download Summary Report (.txt)", 
-                data=build_txt_report(), 
-                file_name=f"Intel_Report_{uploaded_file.name}.txt", 
-                mime="text/plain"
-            )
