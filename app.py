@@ -63,8 +63,13 @@ if uploaded_file is not None:
                             for page in reader.pages:
                                 text_content += page.extract_text() or ""
                         elif inner_ext == "docx":
+                            # Safe alternative extraction from zip file structure
                             docx_bytes = io.BytesIO(f.read())
-                            text_content += docx2txt.process(docx_bytes) + "\n"
+                            doc_obj = Document(docx_bytes)
+                            full_text = []
+                            for para in doc_obj.paragraphs:
+                                full_text.append(para.text)
+                            text_content += "\n".join(full_text) + "\n"
         st.success(f"Successfully analyzed: {uploaded_file.name}")
     except Exception as e:
         st.error(f"System Parsing Error: {e}")
@@ -186,10 +191,3 @@ if uploaded_file is not None:
             for item in risk_insights:
                 document_content.append(Paragraph(f"• {item}", styles['Normal']))
                 document_content.append(Spacer(1, 6))
-            pdf_doc.build(document_content)
-            return output_stream.getvalue()
-            
-        if "(.pdf)" in format_choice:
-            st.download_button(
-                label="📥 Download Summary Report (.pdf)", 
-                data=build_pdf_report(), 
