@@ -36,18 +36,18 @@ uploaded_file = st.file_uploader(
 )
 
 if uploaded_file is not None:
-    text_content = ""
+    text_segments = []
     file_type = uploaded_file.name.split(".")[-1].lower()
     
     try:
         if file_type == "pdf":
             reader = PdfReader(uploaded_file)
             for page in reader.pages:
-                text_content += page.extract_text() or ""
+                text_segments.append(page.extract_text() or "")
         elif file_type == "docx":
-            text_content = docx2txt.process(uploaded_file)
+            text_segments.append(docx2txt.process(uploaded_file))
         elif file_type == "txt":
-            text_content = uploaded_file.read().decode("utf-8")
+            text_segments.append(uploaded_file.read().decode("utf-8"))
         elif file_type == "zip":
             with zipfile.ZipFile(uploaded_file) as z:
                 for file_info in z.infolist():
@@ -56,24 +56,24 @@ if uploaded_file is not None:
                     inner_ext = file_info.filename.split(".")[-1].lower()
                     with z.open(file_info) as f:
                         if inner_ext == "txt":
-                            text_content += f.read().decode("utf-8") + "\n"
+                            text_segments.append(f.read().decode("utf-8"))
                         elif inner_ext == "pdf":
                             pdf_bytes = io.BytesIO(f.read())
                             reader = PdfReader(pdf_bytes)
                             for page in reader.pages:
-                                text_content += page.extract_text() or ""
+                                text_segments.append(page.extract_text() or "")
                         elif inner_ext == "docx":
-                            # Safe alternative extraction from zip file structure
                             docx_bytes = io.BytesIO(f.read())
                             doc_obj = Document(docx_bytes)
-                            full_text = []
-                            for para in doc_obj.paragraphs:
-                                full_text.append(para.text)
-                            text_content += "\n".join(full_text) + "\n"
+                            full_text = [para.text for para in doc_obj.paragraphs]
+                            text_segments.append("\n".join(full_text))
+                            
         st.success(f"Successfully analyzed: {uploaded_file.name}")
     except Exception as e:
         st.error(f"System Parsing Error: {e}")
-        text_content = ""
+        text_segments = []
+
+    text_content = "\n".join(text_segments).strip()
 
     if text_content:
         sentences = re.split(r'(?<=[\.!?])\s+', text_content)
@@ -142,10 +142,10 @@ if uploaded_file is not None:
         )
         
         def build_txt_report():
-            report = f"LIMITLESS BLUE EXECUTIVE INTEL RECAP:\\n{uploaded_file.name.upper()}\\n" + "="*50 + "\\n\\n"
-            report += "[FINANCIAL MILESTONES]\\n" + "\\n".join([f"- {f}" for f in financial_insights]) + "\\n\\n"
-            report += "[OPERATIONAL DIRECTIVES]\\n" + "\\n".join([f"- {o}" for o in operational_insights]) + "\\n\\n"
-            report += "[CRITICAL COMPLIANCE RISKS]\\n" + "\\n".join([f"- {r}" for r in risk_insights]) + "\\n"
+            report = f"LIMITLESS BLUE EXECUTIVE INTEL RECAP:\n{uploaded_file.name.upper()}\n" + "="*50 + "\n\n"
+            report += "[FINANCIAL MILESTONES]\n" + "\n".join([f"- {f}" for f in financial_insights]) + "\n\n"
+            report += "[OPERATIONAL DIRECTIVES]\n" + "\n".join([f"- {o}" for o in operational_insights]) + "\n\n"
+            report += "[CRITICAL COMPLIANCE RISKS]\n" + "\n".join([f"- {r}" for r in risk_insights]) + "\n"
             return report.encode('utf-8')
             
         def build_docx_report():
@@ -191,3 +191,6 @@ if uploaded_file is not None:
             for item in risk_insights:
                 document_content.append(Paragraph(f"• {item}", styles['Normal']))
                 document_content.append(Spacer(1, 6))
+            pdf_doc.build(document_content)
+            return output_stream.getvalue()
+            
