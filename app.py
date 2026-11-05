@@ -8,6 +8,7 @@ from docx import Document
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
+import zipfile
 
 st.set_page_config(
     page_title="Limitless Blue AI", page_icon="🔷", 
@@ -30,8 +31,8 @@ st.markdown("### Secure, localized data extraction for corporate and legal compl
 st.markdown("---")
 
 uploaded_file = st.file_uploader(
-    "Upload Corporate File (PDF, DOCX, or TXT)", 
-    type=["pdf", "docx", "txt"]
+    "Upload Corporate File (PDF, DOCX, TXT, or ZIP)", 
+    type=["pdf", "docx", "txt", "zip"]
 )
 
 if uploaded_file is not None:
@@ -47,6 +48,23 @@ if uploaded_file is not None:
             text_content = docx2txt.process(uploaded_file)
         elif file_type == "txt":
             text_content = uploaded_file.read().decode("utf-8")
+        elif file_type == "zip":
+            with zipfile.ZipFile(uploaded_file) as z:
+                for file_info in z.infolist():
+                    if file_info.filename.startswith('__MACOSX/') or file_info.is_dir():
+                        continue
+                    inner_ext = file_info.filename.split(".")[-1].lower()
+                    with z.open(file_info) as f:
+                        if inner_ext == "txt":
+                            text_content += f.read().decode("utf-8") + "\n"
+                        elif inner_ext == "pdf":
+                            pdf_bytes = io.BytesIO(f.read())
+                            reader = PdfReader(pdf_bytes)
+                            for page in reader.pages:
+                                text_content += page.extract_text() or ""
+                        elif inner_ext == "docx":
+                            docx_bytes = io.BytesIO(f.read())
+                            text_content += docx2txt.process(docx_bytes) + "\n"
         st.success(f"Successfully analyzed: {uploaded_file.name}")
     except Exception as e:
         st.error(f"System Parsing Error: {e}")
@@ -175,20 +193,3 @@ if uploaded_file is not None:
             st.download_button(
                 label="📥 Download Summary Report (.pdf)", 
                 data=build_pdf_report(), 
-                file_name=f"Intel_Report_{uploaded_file.name}.pdf", 
-                mime="application/pdf"
-            )
-        elif "(.docx)" in format_choice:
-            st.download_button(
-                label="📥 Download Summary Report (.docx)", 
-                data=build_docx_report(), 
-                file_name=f"Intel_Report_{uploaded_file.name}.docx", 
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            )
-        else:
-            st.download_button(
-                label="📥 Download Summary Report (.txt)", 
-                data=build_txt_report(), 
-                file_name=f"Intel_Report_{uploaded_file.name}.txt", 
-                mime="text/plain"
-            )
