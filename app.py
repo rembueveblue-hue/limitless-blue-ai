@@ -81,6 +81,48 @@ def build_pdf_report(filename, financial, operational, risk):
     pdf_doc.build(document_content)
     return output_stream.getvalue()
 
+# --- ISOLATED SPLIT FUNCTION CHANNELS ---
+
+def process_single_file(file_obj, ext):
+    """Processes standalone document streams with original working structure."""
+    text = ""
+    if ext == "pdf":
+        reader = PdfReader(file_obj)
+        for page in reader.pages:
+            text += page.extract_text() or ""
+    elif ext == "docx":
+        text = docx2txt.process(file_obj)
+    elif ext == "txt":
+        text = file_obj.read().decode("utf-8")
+        file_obj.seek(0)  # Immediately release byte track pointer
+    return text
+
+def process_zip_file(zip_obj):
+    """Processes file layers safely extracted from a zip container."""
+    combined_text = []
+    with zipfile.ZipFile(zip_obj) as z:
+        for file_info in z.infolist():
+            if file_info.filename.startswith('__MACOSX/') or file_info.is_dir():
+                continue
+            inner_ext = file_info.filename.split(".")[-1].lower()
+            with z.open(file_info) as f:
+                if inner_ext == "txt":
+                    combined_text.append(f.read().decode("utf-8"))
+                elif inner_ext == "pdf":
+                    pdf_bytes = io.BytesIO(f.read())
+                    reader = PdfReader(pdf_bytes)
+                    inner_pdf_text = ""
+                    for page in reader.pages:
+                        inner_pdf_text += page.extract_text() or ""
+                    combined_text.append(inner_pdf_text)
+                elif inner_ext == "docx":
+                    docx_bytes = io.BytesIO(f.read())
+                    doc_obj = Document(docx_bytes)
+                    inner_docx_text = [para.text for para in doc_obj.paragraphs]
+                    combined_text.append("\n".join(inner_docx_text))
+    return "\n".join(combined_text)
+
+
 # # 3. Executive Header Layout
 st.markdown("# 🔷 Limitless Blue | Enterprise Document Intelligence Engine")
 st.markdown("### Secure, localized data extraction for corporate and legal compliance evaluation.")
@@ -92,48 +134,26 @@ uploaded_file = st.file_uploader(
 )
 
 if uploaded_file is not None:
-    text_segments = []
+    text_content = ""
     file_type = uploaded_file.name.split(".")[-1].lower()
     
     try:
-        if file_type == "pdf":
-            reader = PdfReader(uploaded_file)
-            for page in reader.pages:
-                text_segments.append(page.extract_text() or "")
-        elif file_type == "docx":
-            text_segments.append(docx2txt.process(uploaded_file))
-        elif file_type == "txt":
-            text_segments.append(uploaded_file.read().decode("utf-8"))
-            uploaded_file.seek(0)  # RESET POINTER: Keeps file readable for download compilation
-        elif file_type == "zip":
-            with zipfile.ZipFile(uploaded_file) as z:
-                for file_info in z.infolist():
-                    if file_info.filename.startswith('__MACOSX/') or file_info.is_dir():
-                        continue
-                    inner_ext = file_info.filename.split(".")[-1].lower()
-                    with z.open(file_info) as f:
-                        if inner_ext == "txt":
-                            text_segments.append(f.read().decode("utf-8"))
-                        elif inner_ext == "pdf":
-                            pdf_bytes = io.BytesIO(f.read())
-                            reader = PdfReader(pdf_bytes)
-                            for page in reader.pages:
-                                text_segments.append(page.extract_text() or "")
-                        elif inner_ext == "docx":
-                            docx_bytes = io.BytesIO(f.read())
-                            doc_obj = Document(docx_bytes)
-                            full_text = [para.text for para in doc_obj.paragraphs]
-                            text_segments.append("\n".join(full_text))
-            uploaded_file.seek(0)  # RESET POINTER: Keeps file readable for download compilation
-                            
-        st.success(f"Successfully analyzed: {uploaded_file.name}")
+        # Route file evaluation through split path logic
+        if file_type == "zip":
+            text_content = process_zip_file(uploaded_file)
+        else:
+            text_content = process_single_file(uploaded_file, file_type)
+            
+        if text_content.strip():
+            st.success(f"Successfully analyzed: {uploaded_file.name}")
+        else:
+            st.warning("No readable text content found inside the file.")
+            
     except Exception as e:
         st.error(f"System Parsing Error: {e}")
-        text_segments = []
+        text_content = ""
 
-    text_content = "\n".join(text_segments).strip()
-
-    if text_content:
+    if text_content.strip():
         sentences = re.split(r'(?<=[\.!?])\s+', text_content)
         financial_insights = []
         risk_insights = []
@@ -193,11 +213,3 @@ if uploaded_file is not None:
         st.bar_chart(data=chart_df, x="Metrics", y="Count", use_container_width=True)
         st.markdown("---")
         
-        # # 4. Multi-Format Export Module Hub
-        st.subheader("📥 Export Intelligence Report Hub")
-        format_choice = st.selectbox(
-            "Select Export Format Preference:", 
-            ["Portable Document Format (.pdf)", "Microsoft Word (.docx)", "Plain Text Document (.txt)"]
-        )
-        
-        if "(.pdf)" in format_choice:
