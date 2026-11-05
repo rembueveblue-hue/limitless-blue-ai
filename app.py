@@ -81,7 +81,7 @@ def build_pdf_report(filename, financial, operational, risk):
     pdf_doc.build(document_content)
     return output_stream.getvalue()
 
-# --- ISOLATED SPLIT FUNCTION CHANNELS ---
+# --- ISOLATED UNIFIED EXTRACTION PIPELINE CHANNELS ---
 
 def process_single_file(file_obj, ext):
     text = ""
@@ -100,7 +100,8 @@ def process_zip_file(zip_obj):
     combined_text = []
     with zipfile.ZipFile(zip_obj) as z:
         for file_info in z.infolist():
-            if file_info.filename.startswith('__MACOSX/') or file_info.is_dir():
+            # Skip hidden dynamic system metadata folders or directory elements entirely
+            if file_info.filename.startswith('__MACOSX/') or file_info.filename.startswith('.') or file_info.is_dir():
                 continue
             inner_ext = file_info.filename.split(".")[-1].lower()
             with z.open(file_info) as f:
@@ -114,11 +115,11 @@ def process_zip_file(zip_obj):
                         inner_pdf_text += page.extract_text() or ""
                     combined_text.append(inner_pdf_text)
                 elif inner_ext == "docx":
+                    # Swapped out document parser layer with reliable docx2txt framework stream handling
                     docx_bytes = io.BytesIO(f.read())
-                    doc_obj = Document(docx_bytes)
-                    inner_docx_text = [para.text for para in doc_obj.paragraphs]
-                    combined_text.append("\n".join(inner_docx_text))
-    return "\n".join(combined_text)
+                    inner_docx_text = docx2txt.process(docx_bytes)
+                    combined_text.append(inner_docx_text)
+    return "\n\n".join(combined_text)
 
 # # 3. Executive Header Layout
 st.markdown("# 🔷 Limitless Blue | Enterprise Document Intelligence Engine")
@@ -130,13 +131,13 @@ uploaded_file = st.file_uploader(
     type=["pdf", "docx", "txt", "zip"]
 )
 
-# Initialize unique session states to store analytics persistently during selectbox updates
+# Initialize persistent tracking keys to secure parsed text across selectbox updates
 if "active_text" not in st.session_state:
     st.session_state.active_text = ""
     st.session_state.last_file = None
 
 if uploaded_file is not None:
-    # Read files only if it's a completely new upload event
+    # Trigger parser routing only if file initialization context shifts
     if st.session_state.last_file != uploaded_file.name:
         file_type = uploaded_file.name.split(".")[-1].lower()
         try:
@@ -153,7 +154,10 @@ if uploaded_file is not None:
     if st.session_state.active_text.strip():
         st.success(f"Successfully analyzed: {uploaded_file.name}")
         
-        sentences = re.split(r'(?<=[\.!?])\s+', st.session_state.active_text)
+        # Clean text layout spacing variations before initiating matrix processing
+        cleaned_text = re.sub(r'\s+', ' ', st.session_state.active_text)
+        sentences = re.split(r'(?<=[\.!?])\s+', cleaned_text)
+        
         financial_insights = []
         risk_insights = []
         operational_insights = []
@@ -203,9 +207,3 @@ if uploaded_file is not None:
             else:
                 st.info("No critical legal compliance flags detected.")
                 
-        st.markdown("#### Data Extraction Insights Density")
-        metric_counts = {
-            "Metrics": ["Financial Elements", "Operational Steps", "Risk Factors"],
-            "Count": [len(financial_insights), len(operational_insights), len(risk_insights)]
-        }
-        chart_df = pd.DataFrame(metric_counts)
