@@ -27,7 +27,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# # 2. Document Construction Helper Engines (Isolated from layout reruns)
+# # 2. Document Construction Helper Engines
 def build_txt_report(filename, financial, operational, risk):
     report = f"LIMITLESS BLUE EXECUTIVE INTEL RECAP:\n{filename.upper()}\n" + "="*50 + "\n\n"
     report += "[FINANCIAL MILESTONES]\n" + "\n".join([f"- {f}" for f in financial]) + "\n\n"
@@ -57,7 +57,7 @@ def build_pdf_report(filename, financial, operational, risk):
     pdf_doc = SimpleDocTemplate(output_stream, pagesize=letter, title="Limitless Blue Intel Review")
     styles = getSampleStyleSheet()
     document_content = [
-        Paragraph("<font size=22 color='#1d4ed8'><b>🔷 Limitless Blue Executive Report</b></font>", styles['Title']),
+        Paragraph("<font size=22 color='#1d4ed8'><b>Limitless Blue Executive Report</b></font>", styles['Title']),
         Paragraph(f"<b>Extracted Audit Summary:</b> {filename}", styles['Normal']),
         Spacer(1, 15),
         Paragraph("<font size=14 color='#1e3a8a'><b>Financial Metrics & Performance</b></font>", styles['Heading2']),
@@ -104,6 +104,7 @@ if uploaded_file is not None:
             text_segments.append(docx2txt.process(uploaded_file))
         elif file_type == "txt":
             text_segments.append(uploaded_file.read().decode("utf-8"))
+            uploaded_file.seek(0)  # RESET POINTER: Keeps file readable for download compilation
         elif file_type == "zip":
             with zipfile.ZipFile(uploaded_file) as z:
                 for file_info in z.infolist():
@@ -123,6 +124,7 @@ if uploaded_file is not None:
                             doc_obj = Document(docx_bytes)
                             full_text = [para.text for para in doc_obj.paragraphs]
                             text_segments.append("\n".join(full_text))
+            uploaded_file.seek(0)  # RESET POINTER: Keeps file readable for download compilation
                             
         st.success(f"Successfully analyzed: {uploaded_file.name}")
     except Exception as e:
@@ -199,5 +201,3 @@ if uploaded_file is not None:
         )
         
         if "(.pdf)" in format_choice:
-            st.download_button(
-                label="📥 Download Summary Report (.pdf)", 
