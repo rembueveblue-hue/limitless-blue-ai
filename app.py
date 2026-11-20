@@ -50,7 +50,6 @@ def is_valid_sentence(s):
     ]
     if any(n in s_low for n in noise_markers):
         return False
-    # Reject sentences that are mostly numbers/symbols with too few real words
     words = re.findall(r'[a-zA-Z]{2,}', s)
     return len(words) >= 5
 
@@ -66,11 +65,6 @@ def extract_single_stream(f_obj, ext):
     return ""
 
 def analyze_documents(doc_map):
-    """
-    Universal B2B Intelligence Scorer:
-    Adapts to any sector by scoring structural patterns + corpus term density
-    across single files or 100-file ZIP archives.
-    """
     all_words = Counter()
     doc_sentences = {}
 
@@ -86,7 +80,6 @@ def analyze_documents(doc_map):
 
     top_themes = {w for w, _ in all_words.most_common(25)}
 
-    # Universal structural patterns (works across finance, legal, medical, logistics, engineering)
     metric_pattern = re.compile(
         r'(\$|€|£|¥|zar|usd|eur|gbp|\b\d+(?:\.\d+)?%|\b\d+\s*(?:hours?|days?|weeks?|months?|years?|tons?|units?|mw|kw|gb|tb|mb)\b|\b(?:cost|fee|budget|revenue|margin|invoice|quota|limit|threshold|rate|price|amount)\b)',
         re.IGNORECASE
@@ -130,7 +123,6 @@ def analyze_documents(doc_map):
                 scored_mandates.append((o_hits * 3 + theme_score, label))
                 seen.add(norm_key)
 
-    # Scale summary depth automatically: 6 bullets for single file, up to 15 for multi-file ZIPs
     cap = min(15, max(6, len(doc_sentences) * 2)) if multi_file else 6
 
     scored_metrics.sort(key=lambda x: x[0], reverse=True)
@@ -212,7 +204,7 @@ if uploaded_file:
                         info for info in z.infolist()
                         if not info.filename.startswith('__MACOSX/') and not info.is_dir()
                         and info.filename.split(".")[-1].lower() in {"pdf", "docx", "txt"}
-                    ][:100]  # Hard cap at 100 files per enterprise archive
+                    ][:100]
 
                     for info in valid_entries:
                         inner_ext = info.filename.split(".")[-1].lower()
@@ -225,3 +217,11 @@ if uploaded_file:
             fin_list, ops_list, rsk_list, processed_count = analyze_documents(doc_map)
 
             if fin_list or ops_list or rsk_list or processed_count > 0:
+                st.session_state.fin = fin_list
+                st.session_state.ops = ops_list
+                st.session_state.rsk = rsk_list
+                st.session_state.file_count = processed_count
+                st.session_state.active_fn = uploaded_file.name
+                st.success(f"Successfully analyzed: {uploaded_file.name} ({processed_count} document{'s' if processed_count != 1 else ''} processed in-memory)")
+            else:
+                st.warning("No readable text discovered in file contents.")
