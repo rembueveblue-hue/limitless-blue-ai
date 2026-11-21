@@ -1,222 +1,131 @@
 import streamlit as st
-import docx
+from pypdf import PdfReader
+import docx2txt
 import re
 import io
-import zipfile
 import pandas as pd
-from datetime import datetime
+from docx import Document
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
+import zipfile
 
-# Auto-detect whichever PDF engine is installed on Streamlit Cloud
-PDF_ENGINE = None
-try:
-    import pypdf
-    PDF_ENGINE = "pypdf"
-except ImportError:
-    try:
-        import PyPDF2
-        PDF_ENGINE = "PyPDF2"
-    except ImportError:
-        try:
-            import fitz
-            PDF_ENGINE = "fitz"
-        except ImportError:
-            PDF_ENGINE = None
+st.set_page_config(page_title="Limitless Blue AI", page_icon="🔷", layout="wide")
 
-# --- 1. PAGE CONFIG ---
-st.set_page_config(
-    page_title="LIMITLESS BLUE | Enterprise Document Intelligence",
-    page_icon="🔷",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
-
-# --- 2. CLEAN DARK-MODE UI ---
 st.markdown("""
     <style>
-    .stApp { background-color: #0b0f19; color: #f1f5f9; }
-    header[data-testid="stHeader"] { display: none; }
-    #MainMenu { visibility: hidden; }
-    footer { visibility: hidden; }
-    
-    .brand-title { font-size: 2.3rem; font-weight: 800; color: #ffffff; margin-bottom: 0.2rem; }
-    .brand-accent { color: #38bdf8; }
-    .brand-sub { color: #94a3b8; font-size: 1.0rem; margin-bottom: 1.4rem; }
-    
-    .domain-badge {
-        display: inline-block;
-        background-color: #1e293b;
-        border: 1px solid #38bdf8;
-        color: #38bdf8;
-        padding: 4px 12px;
-        border-radius: 999px;
-        font-size: 0.85rem;
-        font-weight: 600;
-        margin-bottom: 1rem;
-    }
-
-    .metric-box {
-        background-color: #111827;
-        border: 1px solid #1e293b;
-        border-left: 4px solid #38bdf8;
-        padding: 1.05rem;
-        border-radius: 6px;
-        margin-bottom: 0.85rem;
-        line-height: 1.5;
-    }
-    .directive-box {
-        background-color: #111827;
-        border: 1px solid #1e293b;
-        border-left: 4px solid #10b981;
-        padding: 1.05rem;
-        border-radius: 6px;
-        margin-bottom: 0.85rem;
-        line-height: 1.5;
-    }
-    .risk-box {
-        background-color: #111827;
-        border: 1px solid #1e293b;
-        border-left: 4px solid #f43f5e;
-        padding: 1.05rem;
-        border-radius: 6px;
-        margin-bottom: 0.85rem;
-        line-height: 1.5;
-    }
-    .src-label { color: #94a3b8; font-size: 0.78rem; margin-top: 0.4rem; display: block; }
+    h1 { color: #4e8cff; font-family: 'Helvetica Neue', sans-serif; font-weight: 700; }
+    h3 { color: var(--text-color); font-weight: 400; opacity: 0.8; }
+    h4 { color: var(--text-color); border-bottom: 2px solid #1d4ed8; padding-bottom: 6px; margin-top: 15px; }
+    .stButton>button { background-color: #1d4ed8; color: white; border-radius: 6px; width: 100%; height: 45px; font-weight: bold; border: none; }
+    .metric-box { padding: 14px; background-color: rgba(78, 140, 255, 0.12); color: var(--text-color); border-radius: 8px; margin: 10px 0; border-left: 4px solid #4e8cff; font-size: 14px; line-height: 1.6; }
+    .risk-box { padding: 14px; background-color: rgba(239, 68, 68, 0.12); color: var(--text-color); border-radius: 8px; margin: 10px 0; border-left: 4px solid #ef4444; font-size: 14px; line-height: 1.6; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. ADAPTIVE DOMAIN LENSES ---
-DOMAIN_PROFILES = {
-    "Healthcare & Medical Aid": {
-        "detect": ("patient", "diagnosis", "clinical", "medical aid", "scheme", "tariff", "co-payment", "pmb", "authorization", "hospital", "claim"),
-        "p1_title": "Benefit Limits, Tariffs & Co-Payments",
-        "p1_keys": ("tariff", "limit", "co-payment", "levy", "reimbursement", "benefit", "premium", "contribution", "cost", "%", "$", "zar"),
-        "p2_title": "Clinical & Pre-Authorization Protocols",
-        "p2_keys": ("protocol", "authorization", "pre-auth", "pmb", "referral", "dosage", "treatment", "guideline", "mandatory", "rule"),
-        "p3_title": "Exclusions & Compliance Risks",
-        "p3_keys": ("exclusion", "waiting period", "penalty", "rejection", "breach", "liability", "non-compliance", "fraud", "dispute"),
-        "summary": "Adaptive healthcare synthesis isolates scheme benefit limits, clinical pre-authorization protocols, and policy exclusion risks."
-    },
-    "Legal & Regulatory Contracts": {
-        "detect": ("plaintiff", "defendant", "clause", "indemnity", "jurisdiction", "arbitration", "hereby", "termination", "nda", "agreement", "statute"),
-        "p1_title": "Commercial Stakes, Fees & Liability Caps",
-        "p1_keys": ("fee", "retainer", "damages", "cap", "settlement", "compensation", "royalty", "invoice", "payment", "%", "$", "zar"),
-        "p2_title": "Binding Obligations & Deadlines",
-        "p2_keys": ("shall", "notice", "deliverable", "days", "governing law", "jurisdiction", "obligation", "schedule", "mandatory"),
-        "p3_title": "Indemnity, Breach & Termination Traps",
-        "p3_keys": ("indemnity", "breach", "termination", "arbitration", "nda", "liability", "default", "penalty", "dispute"),
-        "summary": "Adaptive legal synthesis isolates commercial fee exposures, binding contractual deadlines, and indemnity or termination traps."
-    },
-    "Real Estate & Property": {
-        "detect": ("lease", "tenant", "landlord", "escrow", "deed", "zoning", "valuation", "mortgage", "erf", "sectional title", "occupation", "premises"),
-        "p1_title": "Valuations, Rentals & Levies",
-        "p1_keys": ("valuation", "rent", "rental", "levy", "deposit", "yield", "escalation", "rates", "purchase price", "%", "$", "zar"),
-        "p2_title": "Lease & Transfer Conditions",
-        "p2_keys": ("occupation", "inspection", "zoning", "maintenance", "notice", "transfer", "handover", "renewal", "mandatory"),
-        "p3_title": "Title, Zoning & Default Risks",
-        "p3_keys": ("encumbrance", "default", "forfeiture", "structural", "compliance", "eviction", "breach", "defect", "penalty"),
-        "summary": "Adaptive property synthesis isolates rental/valuation figures, transfer obligations, and title or default risks."
-    },
-    "Enterprise Systems & Engineering": {
-        "detect": ("architecture", "pipeline", "api", "latency", "schema", "sap", "datasphere", "deployment", "server", "specification", "integration"),
-        "p1_title": "Resource Budgets & SLA Metrics",
-        "p1_keys": ("sla", "uptime", "latency", "throughput", "budget", "license", "cost", "capacity", "gb", "tb", "%", "$", "zar"),
-        "p2_title": "Architecture & Deployment Mandates",
-        "p2_keys": ("protocol", "pipeline", "schema", "integration", "authentication", "encryption", "schedule", "workflow", "mandatory"),
-        "p3_title": "Security & Bottleneck Risks",
-        "p3_keys": ("vulnerability", "downtime", "bottleneck", "failure", "breach", "compliance", "timeout", "risk", "loss"),
-        "summary": "Adaptive systems synthesis isolates SLA/capacity benchmarks, integration mandates, and bottleneck or security risks."
-    },
-    "Corporate Finance & Operations": {
-        "detect": ("revenue", "ebitda", "profit", "margin", "audit", "expenditure", "shareholder", "balance sheet", "cash flow", "fiscal", "kpi"),
-        "p1_title": "Financial Metrics",
-        "p1_keys": ("revenue", "profit", "margin", "expenditure", "ebitda", "cash flow", "budget", "roi", "valuation", "%", "$", "zar"),
-        "p2_title": "Operational Directives",
-        "p2_keys": ("protocol", "rule", "schedule", "mandatory", "step", "policy", "governance", "audit", "target"),
-        "p3_title": "Critical Risks",
-        "p3_keys": ("liability", "breach", "damage", "nda", "compliance", "penalty", "exposure", "deficit", "loss"),
-        "summary": "Executive synthesis confirms core financial structures, mandatory operational protocols, and potential compliance liabilities."
-    }
-}
-
-# --- 4. UNIVERSAL IN-MEMORY EXTRACTION ENGINE ---
-def read_single_file(file_bytes, filename):
-    ext = filename.split('.').pop().lower()
-    short_name = filename.split('/').pop()
-    chunks = list()
-
-    if ext == "pdf":
-        if PDF_ENGINE == "pypdf":
-            reader = pypdf.PdfReader(io.BytesIO(file_bytes))
-            for page_num, page in enumerate(reader.pages, start=1):
-                txt = page.extract_text()
-                if txt and txt.strip():
-                    chunks.append((txt, f"{short_name} | Page {page_num}"))
-        elif PDF_ENGINE == "PyPDF2":
-            reader = PyPDF2.PdfReader(io.BytesIO(file_bytes))
-            for page_num, page in enumerate(reader.pages, start=1):
-                txt = page.extract_text()
-                if txt and txt.strip():
-                    chunks.append((txt, f"{short_name} | Page {page_num}"))
-        elif PDF_ENGINE == "fitz":
-            doc = fitz.open(stream=file_bytes, filetype="pdf")
-            for page_num, page in enumerate(doc, start=1):
-                txt = page.get_text()
-                if txt and txt.strip():
-                    chunks.append((txt, f"{short_name} | Page {page_num}"))
-
-    elif ext == "docx":
-        doc = docx.Document(io.BytesIO(file_bytes))
-        body_text = ""
-        for p in doc.paragraphs:
-            if p.text.strip():
-                body_text += p.text.strip() + "\n"
-        for table in doc.tables:
-            for row in table.rows:
-                row_text = " - ".join(c.text.strip() for c in row.cells if c.text.strip())
-                if row_text:
-                    body_text += row_text + ".\n"
-        if body_text.strip():
-            chunks.append((body_text, short_name))
-
-    elif ext == "txt":
-        txt = file_bytes.decode("utf-8", errors="ignore")
-        if txt.strip():
-            chunks.append((txt, short_name))
-
-    return chunks
-
-def extract_all(uploaded_file):
-    raw_bytes = uploaded_file.read()
-    ext = uploaded_file.name.split('.').pop().lower()
-    all_chunks = list()
-    file_count = 0
-
-    if ext == "zip":
-        with zipfile.ZipFile(io.BytesIO(raw_bytes)) as z:
-            for name in z.namelist():
-                if not name.endswith('/') and not name.startswith('__MACOSX'):
-                    try:
-                        file_chunks = read_single_file(z.read(name), name)
-                        if file_chunks:
-                            all_chunks.extend(file_chunks)
-                            file_count += 1
-                    except Exception:
-                        pass
+# Isolated data compilation engine prevents document generation faults on web links
+def build_report(fmt, name, financial, operational, risk):
+    if "txt" in fmt:
+        rep = f"LIMITLESS BLUE RECAP:\n{name.upper()}\n" + "="*50 + "\n\n"
+        rep += "[FINANCIAL]\n" + "\n".join([f"- {f}" for f in financial]) + "\n\n"
+        rep += "[OPERATIONS]\n" + "\n".join([f"- {o}" for o in operational]) + "\n\n"
+        rep += "[RISK]\n" + "\n".join([f"- {r}" for r in risk])
+        return rep.encode('utf-8')
+    elif "docx" in fmt:
+        doc = Document()
+        doc.add_heading("Summary Intelligence Report", 0)
+        for title, dataset in [("Financial Index", financial), ("Operations Index", operational), ("Risk Assessment", risk)]:
+            doc.add_heading(title, level=1)
+            for item in dataset: 
+                doc.add_paragraph(item, style='List Bullet')
+        out = io.BytesIO()
+        doc.save(out)
+        return out.getvalue()
     else:
+        out = io.BytesIO()
+        p_doc = SimpleDocTemplate(out, pagesize=letter, title="Review")
+        stls = getSampleStyleSheet()
+        ctx = [Paragraph("<font size=22 color='#1d4ed8'><b>Limitless Blue Executive Report</b></font>", stls['Title']), Spacer(1, 15)]
+        for h, c, l in [("Financial Metrics", "#1e3a8a", financial), ("Operational Directives", "#1e3a8a", operational), ("Critical Risks", "#7f1d1d", risk)]:
+            ctx.append(Paragraph(f"<font size=14 color='{c}'><b>{h}</b></font>", stls['Heading2']))
+            for item in l: 
+                ctx.append(Paragraph(f"• {item}", stls['Normal']))
+            ctx.append(Spacer(1, 10))
+        p_doc.build(ctx)
+        return out.getvalue()
+
+st.markdown("# 🔷 Limitless Blue | Enterprise Document Intelligence Engine")
+st.markdown("### Secure, localized data extraction for corporate and legal compliance evaluation.")
+st.markdown("---")
+
+uploaded_file = st.file_uploader("Upload Corporate File (PDF, DOCX, TXT, or ZIP)", type=["pdf", "docx", "txt", "zip"])
+
+# Persistent state initialization ensures steady execution loops across user selections
+if "fin" not in st.session_state:
+    st.session_state.fin = []
+    st.session_state.ops = []
+    st.session_state.rsk = []
+    st.session_state.active_fn = None
+
+if uploaded_file:
+    if st.session_state.active_fn != uploaded_file.name:
+        txt, ext = "", uploaded_file.name.split(".")[-1].lower()
         try:
-            all_chunks = read_single_file(raw_bytes, uploaded_file.name)
-            file_count = 1
-        except Exception:
-            pass
+            def extract(f_obj, e):
+                if e == "pdf": return "".join([p.extract_text() or "" for p in PdfReader(f_obj).pages])
+                if e == "docx": return docx2txt.process(f_obj)
+                if e == "txt": return f_obj.read().decode("utf-8")
+                return ""
+            
+            if ext == "zip":
+                with zipfile.ZipFile(uploaded_file) as z:
+                    for info in z.infolist():
+                        if not info.filename.startswith('__MACOSX/') and not info.is_dir():
+                            inner_ext = info.filename.split(".")[-1].lower()
+                            with z.open(info) as f: 
+                                txt += extract(io.BytesIO(f.read()) if inner_ext != "txt" else f, inner_ext) + "\n"
+            else:
+                txt = extract(uploaded_file, ext)
+                
+            if txt.strip():
+                sentences = re.split(r'(?<=[\.!?])\s+', txt)
+                st.session_state.fin = list(set([s.strip() for s in sentences if any(k in s.lower() for k in ["$", "revenue", "profit", "expenditure", "cost", "margin", "penalty"]) and len(s.strip()) > 15]))[:5]
+                st.session_state.rsk = list(set([s.strip() for s in sentences if any(k in s.lower() for k in ["liabilit", "breach", "damages", "nondisclosure", "nda", "comply", "compliance", "restrict", "penalty"]) and len(s.strip()) > 15]))[:5]
+                st.session_state.ops = list(set([s.strip() for s in sentences if any(k in s.lower() for k in ["protocol", "tenet", "must", "extract", "auth", "step", "schedul", "scrub"]) and len(s.strip()) > 15]))[:5]
+                st.session_state.active_fn = uploaded_file.name
+                st.success(f"Successfully analyzed: {uploaded_file.name}")
+            else:
+                st.warning("No readable text discovered in file contents.")
+                st.session_state.active_fn = None
+        except Exception as e:
+            st.error(f"Parsing Error: {e}")
+            st.session_state.active_fn = None
 
-    return all_chunks, file_count
-
-def detect_domain(full_text):
-    lower = full_text.lower()
-    best_domain = "Corporate Finance & Operations"
-    best_score = 0
-    for domain, cfg in DOMAIN_PROFILES.items():
+    # Steady UI layout draws from cached computations without repeating extract sweeps
+    if st.session_state.active_fn:
+        st.subheader("📋 Executive Intelligence Summary")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("#### Financial Metrics & Performance")
+            for i in st.session_state.fin: st.markdown(f"<div class='metric-box'><b>[FINANCIAL]</b> {i}</div>", unsafe_allow_html=True)
+            st.markdown("#### Strategic & Operational Directives")
+            for i in st.session_state.ops: st.markdown(f"<div class='metric-box'><b>[OPERATIONS]</b> {i}</div>", unsafe_allow_html=True)
+        with c2:
+            st.markdown("#### Legal Liabilities & Risk Assessment")
+            for i in st.session_state.rsk: st.markdown(f"<div class='risk-box'><b>[CRITICAL RISK]</b> {i}</div>", unsafe_allow_html=True)
+            
+        st.bar_chart(pd.DataFrame({"Metrics": ["Financial", "Operational", "Risk"], "Count": [len(st.session_state.fin), len(st.session_state.ops), len(st.session_state.rsk)]}), x="Metrics", y="Count", use_container_width=True)
+        st.markdown("---")
+        
+        st.subheader("📥 Export Intelligence Report Hub")
+        fmt = st.selectbox("Select Export Format Preference:", ["Portable Document Format (.pdf)", "Microsoft Word (.docx)", "Plain Text Document (.txt)"])
+        ext_m = "pdf" if "pdf" in fmt else "docx" if "docx" in fmt else "txt"
+        
+        st.download_button(
+            label=f"📥 Download Summary Report (.{ext_m})", 
+            data=build_report(ext_m, st.session_state.active_fn, st.session_state.fin, st.session_state.ops, st.session_state.rsk), 
+            file_name=f"Intel_Report_{st.session_state.active_fn}.{ext_m}", 
+            mime=f"application/{ext_m}" if ext_m != "txt" else "text/plain"
+        )
+else:
+    st.session_state.fin, st.session_state.ops, st.session_state.rsk, st.session_state.active_fn = [], [], [], None
