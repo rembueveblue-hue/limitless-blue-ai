@@ -131,62 +131,66 @@ st.markdown("""
 # --- 3. ADAPTIVE GEARBOX (DOMAIN LENSES) ---
 DOMAIN_PROFILES = {
     "Healthcare & Medical Aid": {
-        "detect_words": ["patient", "diagnosis", "clinical", "medical aid", "scheme", "tariff", "co-payment", "pmb", "authorization", "icd-10", "hospital", "formulary", "claim"],
+        "detect_words": ("patient", "diagnosis", "clinical", "medical aid", "scheme", "tariff", "co-payment", "pmb", "authorization", "icd-10", "hospital", "formulary", "claim"),
         "p1_title": "Benefit Limits, Tariffs & Co-Payments",
-        "p1_keys": ["tariff", "limit", "co-payment", "levy", "reimbursement", "benefit", "premium", "contribution", "cost", "%", "$", "zar"],
+        "p1_keys": ("tariff", "limit", "co-payment", "levy", "reimbursement", "benefit", "premium", "contribution", "cost", "%", "$", "zar"),
         "p2_title": "Clinical & Pre-Authorization Protocols",
-        "p2_keys": ["protocol", "authorization", "pre-auth", "pmb", "referral", "dosage", "treatment", "guideline", "procedure", "mandatory", "rule"],
+        "p2_keys": ("protocol", "authorization", "pre-auth", "pmb", "referral", "dosage", "treatment", "guideline", "procedure", "mandatory", "rule"),
         "p3_title": "Exclusions, Waiting Periods & Compliance Risks",
-        "p3_keys": ["exclusion", "waiting period", "penalty", "rejection", "breach", "liability", "non-compliance", "fraud", "dispute", "forfeit"],
+        "p3_keys": ("exclusion", "waiting period", "penalty", "rejection", "breach", "liability", "non-compliance", "fraud", "dispute", "forfeit"),
         "focus": "scheme benefit caps, pre-authorization mandates, and policy exclusions"
     },
     "Legal & Regulatory Contracts": {
-        "detect_words": ["plaintiff", "defendant", "clause", "indemnity", "jurisdiction", "arbitration", "hereby", "termination", "nda", "agreement", "witness", "statute", "affidavit"],
+        "detect_words": ("plaintiff", "defendant", "clause", "indemnity", "jurisdiction", "arbitration", "hereby", "termination", "nda", "agreement", "witness", "statute", "affidavit"),
         "p1_title": "Commercial Stakes, Fees & Liability Caps",
-        "p1_keys": ["fee", "retainer", "damages", "cap", "settlement", "compensation", "royalty", "invoice", "payment", "%", "$", "zar"],
+        "p1_keys": ("fee", "retainer", "damages", "cap", "settlement", "compensation", "royalty", "invoice", "payment", "%", "$", "zar"),
         "p2_title": "Binding Obligations, Notices & Deadlines",
-        "p2_keys": ["shall", "notice", "deliverable", "days", "governing law", "jurisdiction", "execute", "obligation", "schedule", "mandatory"],
+        "p2_keys": ("shall", "notice", "deliverable", "days", "governing law", "jurisdiction", "execute", "obligation", "schedule", "mandatory"),
         "p3_title": "Indemnity, Breach & Termination Traps",
-        "p3_keys": ["indemnity", "breach", "termination", "arbitration", "nda", "liability", "default", "penalty", "infringement", "dispute"],
+        "p3_keys": ("indemnity", "breach", "termination", "arbitration", "nda", "liability", "default", "penalty", "infringement", "dispute"),
         "focus": "commercial fee exposures, binding contractual deadlines, and indemnity/termination traps"
     },
     "Real Estate & Property": {
-        "detect_words": ["lease", "tenant", "landlord", "escrow", "deed", "zoning", "valuation", "mortgage", "erf", "sectional title", "body corporate", "occupation", "premises"],
+        "detect_words": ("lease", "tenant", "landlord", "escrow", "deed", "zoning", "valuation", "mortgage", "erf", "sectional title", "body corporate", "occupation", "premises"),
         "p1_title": "Valuations, Rentals, Levies & Yields",
-        "p1_keys": ["valuation", "rent", "rental", "levy", "deposit", "yield", "escalation", "rates", "purchase price", "%", "$", "zar"],
+        "p1_keys": ("valuation", "rent", "rental", "levy", "deposit", "yield", "escalation", "rates", "purchase price", "%", "$", "zar"),
         "p2_title": "Lease, Occupation & Transfer Conditions",
-        "p2_keys": ["occupation", "inspection", "zoning", "maintenance", "notice", "transfer", "handover", "renewal", "municipal", "mandatory"],
+        "p2_keys": ("occupation", "inspection", "zoning", "maintenance", "notice", "transfer", "handover", "renewal", "municipal", "mandatory"),
         "p3_title": "Title, Zoning & Default Exposures",
-        "p3_keys": ["encumbrance", "default", "forfeiture", "structural", "compliance", "eviction", "breach", "defect", "servitude", "penalty"],
+        "p3_keys": ("encumbrance", "default", "forfeiture", "structural", "compliance", "eviction", "breach", "defect", "servitude", "penalty"),
         "focus": "rental/valuation figures, transfer and maintenance obligations, and title or default risks"
     },
     "Enterprise Systems & Engineering": {
-        "detect_words": ["architecture", "pipeline", "api", "latency", "schema", "sap", "datasphere", "deployment", "server", "bandwidth", "specification", "integration", "database"],
+        "detect_words": ("architecture", "pipeline", "api", "latency", "schema", "sap", "datasphere", "deployment", "server", "bandwidth", "specification", "integration", "database"),
         "p1_title": "Resource Budgets, SLAs & Capacity Metrics",
-        "p1_keys": ["sla", "uptime", "latency", "throughput", "budget", "license", "cost", "capacity", "gb", "tb", "%", "$", "zar"],
+        "p1_keys": ("sla", "uptime", "latency", "throughput", "budget", "license", "cost", "capacity", "gb", "tb", "%", "$", "zar"),
         "p2_title": "System Architecture & Deployment Mandates",
-        "p2_keys": ["protocol", "pipeline", "schema", "integration", "authentication", "encryption", "schedule", "workflow", "mandatory", "step"],
+        "p2_keys": ("protocol", "pipeline", "schema", "integration", "authentication", "encryption", "schedule", "workflow", "mandatory", "step"),
         "p3_title": "Security, Downtime & Bottleneck Risks",
-        "p3_keys": ["vulnerability", "downtime", "bottleneck", "failure", "breach", "compliance", "deprecated", "timeout", "risk", "loss"],
+        "p3_keys": ("vulnerability", "downtime", "bottleneck", "failure", "breach", "compliance", "deprecated", "timeout", "risk", "loss"),
         "focus": "SLA/capacity benchmarks, core integration mandates, and architectural bottleneck or security risks"
     },
     "Corporate Finance & Operations": {
-        "detect_words": ["revenue", "ebitda", "profit", "margin", "audit", "expenditure", "shareholder", "balance sheet", "cash flow", "fiscal", "quarterly", "kpi"],
+        "detect_words": ("revenue", "ebitda", "profit", "margin", "audit", "expenditure", "shareholder", "balance sheet", "cash flow", "fiscal", "quarterly", "kpi"),
         "p1_title": "Financial Metrics & Capital Allocation",
-        "p1_keys": ["revenue", "profit", "margin", "expenditure", "ebitda", "cash flow", "budget", "roi", "valuation", "%", "$", "zar"],
+        "p1_keys": ("revenue", "profit", "margin", "expenditure", "ebitda", "cash flow", "budget", "roi", "valuation", "%", "$", "zar"),
         "p2_title": "Operational Directives & Governance",
-        "p2_keys": ["protocol", "rule", "schedule", "mandatory", "step", "policy", "governance", "audit", "target", "timeline"],
+        "p2_keys": ("protocol", "rule", "schedule", "mandatory", "step", "policy", "governance", "audit", "target", "timeline"),
         "p3_title": "Critical Liabilities & Compliance Risks",
-        "p3_keys": ["liability", "breach", "damage", "nda", "compliance", "penalty", "exposure", "deficit", "loss", "fraud"],
+        "p3_keys": ("liability", "breach", "damage", "nda", "compliance", "penalty", "exposure", "deficit", "loss", "fraud"),
         "focus": "core financial performance drivers, mandatory operational governance, and critical compliance liabilities"
     }
 }
 
 # --- 4. CORE ENGINE BLOCK (100% IN-MEMORY RAM + TABLE EXTRACTION) ---
+def xml_safe(text):
+    return html.escape(str(text), quote=False)
+
 def extract_segments_from_bytes(file_bytes, filename):
-    ext = filename.split('.')[-1].lower()
+    parts = filename.split('.')
+    ext = parts.pop().lower() if len(parts) > 1 else ""
     segments = []
-    short_name = filename.split('/')[-1]
+    short_name = filename.split('/').pop()
     scanned_pages = 0
     try:
         if ext == "pdf":
@@ -208,9 +212,7 @@ def extract_segments_from_bytes(file_bytes, filename):
                     "text": "\n".join(para_lines),
                     "source": f"{short_name} | Body Text"
                 })
-            # Extract structured Word tables (tariffs, pricing, SLAs, schedules)
             for t_idx, table in enumerate(doc.tables, start=1):
                 row_sentences = []
                 for row in table.rows:
                     cells = [c.text.strip().replace("\n", " ") for c in row.cells if c.text.strip()]
-                    if len(cells) >= 2:
