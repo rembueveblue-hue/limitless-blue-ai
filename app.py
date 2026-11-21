@@ -26,27 +26,35 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Isolated data compilation engine prevents document generation faults on web links
-def build_report(fmt, name, metrics, operational, risk):
+def build_report(fmt, name, financial, operational, risk):
     if "txt" in fmt:
-        rep = f"LIMITLESS BLUE EXECUTIVE RECAP:\n{name.upper()}\n" + "="*50 + "\n\n"
-        for title, dataset in [("KEY METRICS & DEADLINES", metrics), ("CORE MANDATES & DIRECTIVES", operational), ("CRITICAL RISKS & EXPOSURE", risk)]:
-            rep += f"[{title}]\n" + ("\n".join([f"- {item}" for item in dataset]) if dataset else "None detected.") + "\n\n"
+        rep = f"LIMITLESS BLUE RECAP:\n{name.upper()}\n" + "="*50 + "\n\n"
+        rep += "[KEY METRICS & DEADLINES]\n" + "\n".join([f"- {f}" for f in financial]) + "\n\n"
+        rep += "[OPERATIONS & MANDATES]\n" + "\n".join([f"- {o}" for o in operational]) + "\n\n"
+        rep += "[CRITICAL RISKS]\n" + "\n".join([f"- {r}" for r in risk])
         return rep.encode('utf-8')
     elif "docx" in fmt:
         doc = Document()
-        doc.add_heading("Limitless Blue Executive Report", 0)
-        for title, dataset in [("Key Metrics & Deadlines", metrics), ("Core Mandates & Directives", operational), ("Critical Risks & Exposure", risk)]:
+        doc.add_heading("Summary Intelligence Report", 0)
+        for title, dataset in [("Key Metrics & Deadlines", financial), ("Operations & Mandates", operational), ("Risk Assessment", risk)]:
             doc.add_heading(title, level=1)
-            for item in (dataset if dataset else ["None detected."]): doc.add_paragraph(item, style='List Bullet')
-        out = io.BytesIO(); doc.save(out); return out.getvalue()
+            for item in dataset:
+                doc.add_paragraph(item, style='List Bullet')
+        out = io.BytesIO()
+        doc.save(out)
+        return out.getvalue()
     else:
-        out = io.BytesIO(); p_doc = SimpleDocTemplate(out, pagesize=letter, title="Limitless Blue Executive Report"); stls = getSampleStyleSheet()
+        out = io.BytesIO()
+        p_doc = SimpleDocTemplate(out, pagesize=letter, title="Review")
+        stls = getSampleStyleSheet()
         ctx = [Paragraph("<font size=22 color='#1d4ed8'><b>Limitless Blue Executive Report</b></font>", stls['Title']), Spacer(1, 15)]
-        for title, color, dataset in [("Key Metrics & Deadlines", "#1e3a8a", metrics), ("Core Mandates & Directives", "#1e3a8a", operational), ("Critical Risks & Exposure", "#7f1d1d", risk)]:
-            ctx.append(Paragraph(f"<font size=14 color='{color}'><b>{title}</b></font>", stls['Heading2']))
-            for item in (dataset if dataset else ["None detected."]): ctx.append(Paragraph(f"• {html.escape(item)}", stls['Normal']))
+        for h, c, l in [("Key Metrics & Deadlines", "#1e3a8a", financial), ("Operational Directives", "#1e3a8a", operational), ("Critical Risks", "#7f1d1d", risk)]:
+            ctx.append(Paragraph(f"<font size=14 color='{c}'><b>{h}</b></font>", stls['Heading2']))
+            for item in l:
+                ctx.append(Paragraph(f"• {html.escape(item)}", stls['Normal']))
             ctx.append(Spacer(1, 10))
-        p_doc.build(ctx); return out.getvalue()
+        p_doc.build(ctx)
+        return out.getvalue()
 
 st.markdown("# 💎 Limitless Blue | Enterprise Document Intelligence Engine")
 st.markdown("### Secure, localized data extraction for corporate and legal compliance evaluation.")
@@ -64,6 +72,7 @@ if "fin" not in st.session_state:
 if uploaded_file:
     if st.session_state.active_fn != uploaded_file.name:
         txt, ext = "", uploaded_file.name.split(".")[-1].lower()
+        file_count = 1
         try:
             def extract(f_obj, e):
                 if e == "pdf": return " ".join([p.extract_text() or "" for p in PdfReader(f_obj).pages])
@@ -72,30 +81,39 @@ if uploaded_file:
                 return ""
             
             if ext == "zip":
+                chunks = []
                 with zipfile.ZipFile(uploaded_file) as z:
-                    for info in z.infolist():
-                        if not info.filename.startswith('__MACOSX/') and not info.is_dir():
-                            inner_ext = info.filename.split(".")[-1].lower()
-                            with z.open(info) as f: 
-                                txt += extract(io.BytesIO(f.read()) if inner_ext != "txt" else f, inner_ext) + " "
+                    entries = [i for i in z.infolist() if not i.filename.startswith('__MACOSX/') and not i.is_dir()][:100]
+                    file_count = len(entries)
+                    for info in entries:
+                        inner_ext = info.filename.split(".")[-1].lower()
+                        with z.open(info) as f:
+                            chunks.append(extract(io.BytesIO(f.read()) if inner_ext != "txt" else f, inner_ext))
+                txt = "\n".join(chunks)
             else:
                 txt = extract(uploaded_file, ext)
                 
             if txt.strip():
                 txt = unicodedata.normalize("NFKC", txt)
                 sentences = re.split(r'(?<=[\.!?])\s+', re.sub(r'\s+', ' ', txt))
-                fin_list, rsk_list, ops_list, seen = [], [], [], set()
-                for s in sentences:
-                    s = s.strip()
-                    if 25 < len(s) < 400 and s not in seen and "http" not in s.lower():
+                cap = min(15, max(5, file_count * 2)) if ext == "zip" else 5
+                seen = set()
+                fin_list, rsk_list, ops_list = [], [], []
+
+                for raw_s in sentences:
+                    s = raw_s.strip()
+                    if 20 < len(s) < 420 and s not in seen and "http" not in s.lower():
                         s_low = s.lower()
-                        if any(k in s_low for k in ["liabilit", "breach", "damages", "nondisclosure", "nda", "restrict", "penalty", "penalties", "guilty", "negligen", "deficien", "risk", "exposure", "violat"]) and len(rsk_list) < 8:
-                            rsk_list.append(s); seen.add(s)
-                        elif any(k in s_low for k in ["$", "€", "£", "zar", "revenue", "profit", "expenditure", "cost", "margin", "budget", "fee", "amount", "hours", "days", "years", "deadline", "%"]) and len(fin_list) < 8:
-                            fin_list.append(s); seen.add(s)
-                        elif any(k in s_low for k in ["protocol", "tenet", "must", "shall", "required", "extract", "auth", "step", "schedul", "scrub", "comply", "compliance", "procedure", "maintain", "issued", "acknowledge", "fulfill"]) and len(ops_list) < 8:
-                            ops_list.append(s); seen.add(s)
-                
+                        if any(k in s_low for k in ["liabilit", "breach", "damages", "nondisclosure", "nda", "restrict", "penalty", "guilty", "negligen", "deficien", "risk", "exposure", "violat"]) and len(rsk_list) < cap:
+                            rsk_list.append(s)
+                            seen.add(s)
+                        elif any(k in s_low for k in ["$", "€", "£", "zar", "revenue", "profit", "expenditure", "cost", "margin", "fee", "budget", "amount", "hours", "days", "years", "deadline", "%"]) and len(fin_list) < cap:
+                            fin_list.append(s)
+                            seen.add(s)
+                        elif any(k in s_low for k in ["protocol", "tenet", "must", "shall", "required", "extract", "auth", "step", "schedul", "scrub", "comply", "compliance", "procedure", "maintain", "issued", "acknowledge"]) and len(ops_list) < cap:
+                            ops_list.append(s)
+                            seen.add(s)
+
                 st.session_state.fin = fin_list
                 st.session_state.rsk = rsk_list
                 st.session_state.ops = ops_list
@@ -114,23 +132,14 @@ if uploaded_file:
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("#### Key Metrics & Deadlines")
-            if st.session_state.fin:
-                for i in st.session_state.fin: st.markdown(f"<div class='metric-box'><b>[METRICS]</b> {i}</div>", unsafe_allow_html=True)
-            else:
-                st.info("No explicit metrics or deadlines detected.")
-            st.markdown("#### Core Mandates & Directives")
-            if st.session_state.ops:
-                for i in st.session_state.ops: st.markdown(f"<div class='metric-box'><b>[MANDATES]</b> {i}</div>", unsafe_allow_html=True)
-            else:
-                st.info("No explicit operational mandates detected.")
+            for i in st.session_state.fin: st.markdown(f"<div class='metric-box'><b>[METRICS]</b> {i}</div>", unsafe_allow_html=True)
+            st.markdown("#### Strategic & Operational Directives")
+            for i in st.session_state.ops: st.markdown(f"<div class='metric-box'><b>[OPERATIONS]</b> {i}</div>", unsafe_allow_html=True)
         with c2:
-            st.markdown("#### Critical Risks & Exposure")
-            if st.session_state.rsk:
-                for i in st.session_state.rsk: st.markdown(f"<div class='risk-box'><b>[CRITICAL RISK]</b> {i}</div>", unsafe_allow_html=True)
-            else:
-                st.info("No high-severity risk triggers detected.")
+            st.markdown("#### Legal Liabilities & Risk Assessment")
+            for i in st.session_state.rsk: st.markdown(f"<div class='risk-box'><b>[CRITICAL RISK]</b> {i}</div>", unsafe_allow_html=True)
             
-        st.bar_chart(pd.DataFrame({"Category": ["Metrics & Deadlines", "Mandates", "Critical Risks"], "Count": [len(st.session_state.fin), len(st.session_state.ops), len(st.session_state.rsk)]}), x="Category", y="Count", use_container_width=True)
+        st.bar_chart(pd.DataFrame({"Metrics": ["Metrics", "Operational", "Risk"], "Count": [len(st.session_state.fin), len(st.session_state.ops), len(st.session_state.rsk)]}), x="Metrics", y="Count", use_container_width=True)
         st.markdown("---")
         
         st.subheader("📥 Export Intelligence Report Hub")
