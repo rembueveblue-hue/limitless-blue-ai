@@ -1,5 +1,5 @@
 import streamlit as st
-import pypdf
+import PyPDF2
 import docx
 import re
 import io
@@ -127,14 +127,14 @@ DOMAIN_PROFILES = {
     }
 }
 
-# --- 4. SIMPLE, RELIABLE EXTRACTION (ORIGINAL STYLE) ---
+# --- 4. ORIGINAL PROVEN EXTRACTION ENGINE (PyPDF2 + docx + zipfile) ---
 def read_single_file(file_bytes, filename):
     ext = filename.split('.').pop().lower()
     short_name = filename.split('/').pop()
     chunks = list()
 
     if ext == "pdf":
-        reader = pypdf.PdfReader(io.BytesIO(file_bytes))
+        reader = PyPDF2.PdfReader(io.BytesIO(file_bytes))
         for page_num, page in enumerate(reader.pages, start=1):
             txt = page.extract_text()
             if txt and txt.strip():
