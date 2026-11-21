@@ -9,7 +9,7 @@ import pandas as pd
 from docx import Document
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import zipfile
 
 st.set_page_config(page_title="Limitless Blue AI", page_icon="💎", layout="wide")
@@ -25,7 +25,17 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Isolated data compilation engine prevents document generation faults on web links
+def clean_sentence(text):
+    # Remove stray bullet symbols (■, ●, ▪, •) anywhere in the text
+    text = re.sub(r'[■●▪•▪▫◆◇]\s*', '', text)
+    # Remove leading dashes, colons, or list numbers (e.g., "— ", "1. ")
+    text = re.sub(r'^[\-\—\–\:\d\.\)\s]+', '', text)
+    # Strip merged ALL-CAPS headers (e.g., "SECTION 3: STRATEGIC COMPLIANCE... ")
+    text = re.sub(r'^(?:[A-Z0-9\-\&\:\s]{12,})(?=[A-Z][a-z])', '', text)
+    # Remove trailing dangling list numbers (e.g., "...Matrix (GCM): 1.")
+    text = re.sub(r'\s+\d+\.$', '.', text)
+    return re.sub(r'\s+', ' ', text).strip()
+
 def build_report(fmt, name, financial, operational, risk):
     if "txt" in fmt:
         rep = f"LIMITLESS BLUE RECAP:\n{name.upper()}\n" + "="*50 + "\n\n"
@@ -35,7 +45,7 @@ def build_report(fmt, name, financial, operational, risk):
         return rep.encode('utf-8')
     elif "docx" in fmt:
         doc = Document()
-        doc.add_heading("Summary Intelligence Report", 0)
+        doc.add_heading("Limitless Blue Executive Report", 0)
         for title, dataset in [("Key Metrics & Deadlines", financial), ("Operations & Mandates", operational), ("Risk Assessment", risk)]:
             doc.add_heading(title, level=1)
             for item in dataset:
@@ -45,14 +55,22 @@ def build_report(fmt, name, financial, operational, risk):
         return out.getvalue()
     else:
         out = io.BytesIO()
-        p_doc = SimpleDocTemplate(out, pagesize=letter, title="Review")
+        p_doc = SimpleDocTemplate(out, pagesize=letter, title="Limitless Blue Executive Report")
         stls = getSampleStyleSheet()
-        ctx = [Paragraph("<font size=22 color='#1d4ed8'><b>Limitless Blue Executive Report</b></font>", stls['Title']), Spacer(1, 15)]
+        bullet_style = ParagraphStyle(
+            'CustomBullet',
+            parent=stls['Normal'],
+            spaceAfter=6,
+            leftIndent=12,
+            bulletIndent=0,
+            leading=14
+        )
+        ctx = [Paragraph("<font size=20 color='#1d4ed8'><b>Limitless Blue Executive Report</b></font>", stls['Title']), Spacer(1, 12)]
         for h, c, l in [("Key Metrics & Deadlines", "#1e3a8a", financial), ("Operational Directives", "#1e3a8a", operational), ("Critical Risks", "#7f1d1d", risk)]:
-            ctx.append(Paragraph(f"<font size=14 color='{c}'><b>{h}</b></font>", stls['Heading2']))
+            ctx.append(Paragraph(f"<font size=13 color='{c}'><b>{h}</b></font>", stls['Heading2']))
             for item in l:
-                ctx.append(Paragraph(f"• {html.escape(item)}", stls['Normal']))
-            ctx.append(Spacer(1, 10))
+                ctx.append(Paragraph(f"• {html.escape(item)}", bullet_style))
+            ctx.append(Spacer(1, 8))
         p_doc.build(ctx)
         return out.getvalue()
 
@@ -62,7 +80,6 @@ st.markdown("---")
 
 uploaded_file = st.file_uploader("Upload Corporate File (PDF, DOCX, TXT, or ZIP)", type=["pdf", "docx", "txt", "zip"])
 
-# Persistent state initialization ensures steady execution loops across user selections
 if "fin" not in st.session_state:
     st.session_state.fin = []
     st.session_state.ops = []
@@ -75,7 +92,7 @@ if uploaded_file:
         file_count = 1
         try:
             def extract(f_obj, e):
-                if e == "pdf": return " ".join([p.extract_text() or "" for p in PdfReader(f_obj).pages])
+                if e == "pdf": return "\n".join([p.extract_text() or "" for p in PdfReader(f_obj).pages])
                 if e == "docx": return docx2txt.process(f_obj)
                 if e == "txt": return f_obj.read().decode("utf-8", errors="ignore")
                 return ""
@@ -95,13 +112,15 @@ if uploaded_file:
                 
             if txt.strip():
                 txt = unicodedata.normalize("NFKC", txt)
+                # Normalize line breaks into sentence boundaries before collapsing spaces
+                txt = re.sub(r'\n+', '. ', txt)
                 sentences = re.split(r'(?<=[\.!?])\s+', re.sub(r'\s+', ' ', txt))
                 cap = min(15, max(5, file_count * 2)) if ext == "zip" else 5
                 seen = set()
                 fin_list, rsk_list, ops_list = [], [], []
 
                 for raw_s in sentences:
-                    s = raw_s.strip()
+                    s = clean_sentence(raw_s)
                     if 20 < len(s) < 420 and s not in seen and "http" not in s.lower():
                         s_low = s.lower()
                         if any(k in s_low for k in ["liabilit", "breach", "damages", "nondisclosure", "nda", "restrict", "penalty", "guilty", "negligen", "deficien", "risk", "exposure", "violat"]) and len(rsk_list) < cap:
@@ -126,7 +145,6 @@ if uploaded_file:
             st.error(f"Parsing Error: {e}")
             st.session_state.active_fn = None
 
-    # Steady UI layout draws from cached computations without repeating extract sweeps
     if st.session_state.active_fn:
         st.subheader("📊 Executive Intelligence Summary")
         c1, c2 = st.columns(2)
