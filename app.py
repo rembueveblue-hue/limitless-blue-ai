@@ -1,5 +1,4 @@
 import streamlit as st
-import PyPDF2
 import docx
 import re
 import io
@@ -9,6 +8,22 @@ from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
+
+# Auto-detect whichever PDF engine is installed on Streamlit Cloud
+PDF_ENGINE = None
+try:
+    import pypdf
+    PDF_ENGINE = "pypdf"
+except ImportError:
+    try:
+        import PyPDF2
+        PDF_ENGINE = "PyPDF2"
+    except ImportError:
+        try:
+            import fitz
+            PDF_ENGINE = "fitz"
+        except ImportError:
+            PDF_ENGINE = None
 
 # --- 1. PAGE CONFIG ---
 st.set_page_config(
@@ -127,18 +142,31 @@ DOMAIN_PROFILES = {
     }
 }
 
-# --- 4. ORIGINAL PROVEN EXTRACTION ENGINE (PyPDF2 + docx + zipfile) ---
+# --- 4. UNIVERSAL IN-MEMORY EXTRACTION ENGINE ---
 def read_single_file(file_bytes, filename):
     ext = filename.split('.').pop().lower()
     short_name = filename.split('/').pop()
     chunks = list()
 
     if ext == "pdf":
-        reader = PyPDF2.PdfReader(io.BytesIO(file_bytes))
-        for page_num, page in enumerate(reader.pages, start=1):
-            txt = page.extract_text()
-            if txt and txt.strip():
-                chunks.append((txt, f"{short_name} | Page {page_num}"))
+        if PDF_ENGINE == "pypdf":
+            reader = pypdf.PdfReader(io.BytesIO(file_bytes))
+            for page_num, page in enumerate(reader.pages, start=1):
+                txt = page.extract_text()
+                if txt and txt.strip():
+                    chunks.append((txt, f"{short_name} | Page {page_num}"))
+        elif PDF_ENGINE == "PyPDF2":
+            reader = PyPDF2.PdfReader(io.BytesIO(file_bytes))
+            for page_num, page in enumerate(reader.pages, start=1):
+                txt = page.extract_text()
+                if txt and txt.strip():
+                    chunks.append((txt, f"{short_name} | Page {page_num}"))
+        elif PDF_ENGINE == "fitz":
+            doc = fitz.open(stream=file_bytes, filetype="pdf")
+            for page_num, page in enumerate(doc, start=1):
+                txt = page.get_text()
+                if txt and txt.strip():
+                    chunks.append((txt, f"{short_name} | Page {page_num}"))
 
     elif ext == "docx":
         doc = docx.Document(io.BytesIO(file_bytes))
@@ -192,32 +220,3 @@ def detect_domain(full_text):
     best_domain = "Corporate Finance & Operations"
     best_score = 0
     for domain, cfg in DOMAIN_PROFILES.items():
-        score = sum(lower.count(w) for w in cfg.get("detect", ()))
-        if score > best_score:
-            best_score = score
-            best_domain = domain
-    return best_domain
-
-def filter_signals(chunks, keywords):
-    results = list()
-    seen = set()
-    rand_check = re.compile(r'\bR\s?\d[\d,\.]*')
-
-    for text_block, source_label in chunks:
-        clean_text = re.sub(r'\s+', ' ', text_block)
-        sentences = re.split(r'(?<=[.!?])\s+', clean_text)
-        for s in sentences:
-            s_clean = s.strip()
-            if len(s_clean) < 35 or len(s_clean) > 450:
-                continue
-            s_low = s_clean.lower()
-            matched = any(k in s_low for k in keywords)
-            if not matched and rand_check.search(s_clean) and "zar" in keywords:
-                matched = True
-            if matched and s_clean not in seen:
-                seen.add(s_clean)
-                results.append((s_clean, source_label))
-                if len(results) == 6:
-                    return results
-    return results
-
