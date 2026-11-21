@@ -4,13 +4,11 @@ import docx
 import re
 import io
 import zipfile
-import html
 import pandas as pd
 from datetime import datetime
 from reportlab.lib.pagesizes import letter
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
 
 # --- 1. PAGE CONFIG ---
 st.set_page_config(
@@ -20,199 +18,206 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. EXOTIC CHASSIS & EXECUTIVE COCKPIT UI ---
+# --- 2. CLEAN DARK-MODE UI ---
 st.markdown("""
     <style>
-    .stApp { background-color: #070b14; color: #f1f5f9; }
+    .stApp { background-color: #0b0f19; color: #f1f5f9; }
     header[data-testid="stHeader"] { display: none; }
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
     
-    .top-bar {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 1px solid #1e293b;
-        padding-bottom: 1rem;
-        margin-bottom: 1.4rem;
-    }
-    .brand-title {
-        font-size: 2.35rem;
-        font-weight: 800;
-        letter-spacing: -0.6px;
-        color: #ffffff;
-        margin: 0;
-    }
+    .brand-title { font-size: 2.3rem; font-weight: 800; color: #ffffff; margin-bottom: 0.2rem; }
     .brand-accent { color: #38bdf8; }
-    .brand-sub { color: #94a3b8; font-size: 0.98rem; margin-top: 0.2rem; }
+    .brand-sub { color: #94a3b8; font-size: 1.0rem; margin-bottom: 1.4rem; }
     
-    .security-pill {
-        background: rgba(16, 185, 129, 0.1);
-        border: 1px solid rgba(16, 185, 129, 0.4);
-        color: #34d399;
-        padding: 6px 14px;
-        border-radius: 999px;
-        font-size: 0.78rem;
-        font-weight: 700;
-        letter-spacing: 0.5px;
-    }
-
     .domain-badge {
         display: inline-block;
-        background: rgba(56, 189, 248, 0.12);
+        background-color: #1e293b;
         border: 1px solid #38bdf8;
         color: #38bdf8;
-        padding: 5px 14px;
+        padding: 4px 12px;
         border-radius: 999px;
-        font-size: 0.8rem;
-        font-weight: 700;
-        letter-spacing: 0.5px;
+        font-size: 0.85rem;
+        font-weight: 600;
         margin-bottom: 1rem;
     }
 
-    .exec-brief {
-        background: linear-gradient(135deg, #0f172a 0%, #111827 100%);
+    .metric-box {
+        background-color: #111827;
         border: 1px solid #1e293b;
         border-left: 4px solid #38bdf8;
-        padding: 1.25rem 1.4rem;
-        border-radius: 8px;
-        margin-bottom: 1.25rem;
-        line-height: 1.65;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+        padding: 1.05rem;
+        border-radius: 6px;
+        margin-bottom: 0.85rem;
+        line-height: 1.5;
     }
-
-    .kpi-card {
-        background: linear-gradient(180deg, #111827 0%, #0d1320 100%);
+    .directive-box {
+        background-color: #111827;
         border: 1px solid #1e293b;
-        border-radius: 8px;
-        padding: 0.95rem 1.1rem;
-        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+        border-left: 4px solid #10b981;
+        padding: 1.05rem;
+        border-radius: 6px;
+        margin-bottom: 0.85rem;
+        line-height: 1.5;
     }
-    .kpi-label { color: #94a3b8; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.6px; }
-    .kpi-val { color: #ffffff; font-size: 1.5rem; font-weight: 800; margin-top: 3px; }
-
-    .pillar-meta {
-        color: #94a3b8;
-        font-size: 0.8rem;
-        font-weight: 600;
-        margin-top: -0.4rem;
-        margin-bottom: 0.8rem;
-    }
-
-    .card-box {
-        background-color: #0f172a;
+    .risk-box {
+        background-color: #111827;
         border: 1px solid #1e293b;
-        padding: 1.1rem;
-        border-radius: 8px;
-        margin-bottom: 0.9rem;
-        line-height: 1.58;
-        font-size: 0.93rem;
-        box-shadow: 0 3px 14px rgba(0, 0, 0, 0.25);
+        border-left: 4px solid #f43f5e;
+        padding: 1.05rem;
+        border-radius: 6px;
+        margin-bottom: 0.85rem;
+        line-height: 1.5;
     }
-    .border-p1 { border-left: 4px solid #38bdf8; }
-    .border-p2 { border-left: 4px solid #10b981; }
-    .border-p3 { border-left: 4px solid #f43f5e; }
-
-    .source-tag {
-        display: inline-block;
-        margin-top: 0.6rem;
-        background-color: #1e293b;
-        color: #cbd5e1;
-        font-size: 0.75rem;
-        font-weight: 600;
-        padding: 3px 9px;
-        border-radius: 4px;
-    }
-    .hl-num { color: #38bdf8; font-weight: 700; }
-    .hl-risk { color: #fb7185; font-weight: 700; }
+    .src-label { color: #94a3b8; font-size: 0.78rem; margin-top: 0.4rem; display: block; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. ADAPTIVE GEARBOX (DOMAIN LENSES) ---
+# --- 3. ADAPTIVE DOMAIN LENSES ---
 DOMAIN_PROFILES = {
     "Healthcare & Medical Aid": {
-        "detect_words": ("patient", "diagnosis", "clinical", "medical aid", "scheme", "tariff", "co-payment", "pmb", "authorization", "icd-10", "hospital", "formulary", "claim"),
+        "detect": ("patient", "diagnosis", "clinical", "medical aid", "scheme", "tariff", "co-payment", "pmb", "authorization", "hospital", "claim"),
         "p1_title": "Benefit Limits, Tariffs & Co-Payments",
         "p1_keys": ("tariff", "limit", "co-payment", "levy", "reimbursement", "benefit", "premium", "contribution", "cost", "%", "$", "zar"),
         "p2_title": "Clinical & Pre-Authorization Protocols",
-        "p2_keys": ("protocol", "authorization", "pre-auth", "pmb", "referral", "dosage", "treatment", "guideline", "procedure", "mandatory", "rule"),
-        "p3_title": "Exclusions, Waiting Periods & Compliance Risks",
-        "p3_keys": ("exclusion", "waiting period", "penalty", "rejection", "breach", "liability", "non-compliance", "fraud", "dispute", "forfeit"),
-        "focus": "scheme benefit caps, pre-authorization mandates, and policy exclusions"
+        "p2_keys": ("protocol", "authorization", "pre-auth", "pmb", "referral", "dosage", "treatment", "guideline", "mandatory", "rule"),
+        "p3_title": "Exclusions & Compliance Risks",
+        "p3_keys": ("exclusion", "waiting period", "penalty", "rejection", "breach", "liability", "non-compliance", "fraud", "dispute"),
+        "summary": "Adaptive healthcare synthesis isolates scheme benefit limits, clinical pre-authorization protocols, and policy exclusion risks."
     },
     "Legal & Regulatory Contracts": {
-        "detect_words": ("plaintiff", "defendant", "clause", "indemnity", "jurisdiction", "arbitration", "hereby", "termination", "nda", "agreement", "witness", "statute", "affidavit"),
+        "detect": ("plaintiff", "defendant", "clause", "indemnity", "jurisdiction", "arbitration", "hereby", "termination", "nda", "agreement", "statute"),
         "p1_title": "Commercial Stakes, Fees & Liability Caps",
         "p1_keys": ("fee", "retainer", "damages", "cap", "settlement", "compensation", "royalty", "invoice", "payment", "%", "$", "zar"),
-        "p2_title": "Binding Obligations, Notices & Deadlines",
-        "p2_keys": ("shall", "notice", "deliverable", "days", "governing law", "jurisdiction", "execute", "obligation", "schedule", "mandatory"),
+        "p2_title": "Binding Obligations & Deadlines",
+        "p2_keys": ("shall", "notice", "deliverable", "days", "governing law", "jurisdiction", "obligation", "schedule", "mandatory"),
         "p3_title": "Indemnity, Breach & Termination Traps",
-        "p3_keys": ("indemnity", "breach", "termination", "arbitration", "nda", "liability", "default", "penalty", "infringement", "dispute"),
-        "focus": "commercial fee exposures, binding contractual deadlines, and indemnity/termination traps"
+        "p3_keys": ("indemnity", "breach", "termination", "arbitration", "nda", "liability", "default", "penalty", "dispute"),
+        "summary": "Adaptive legal synthesis isolates commercial fee exposures, binding contractual deadlines, and indemnity or termination traps."
     },
     "Real Estate & Property": {
-        "detect_words": ("lease", "tenant", "landlord", "escrow", "deed", "zoning", "valuation", "mortgage", "erf", "sectional title", "body corporate", "occupation", "premises"),
-        "p1_title": "Valuations, Rentals, Levies & Yields",
+        "detect": ("lease", "tenant", "landlord", "escrow", "deed", "zoning", "valuation", "mortgage", "erf", "sectional title", "occupation", "premises"),
+        "p1_title": "Valuations, Rentals & Levies",
         "p1_keys": ("valuation", "rent", "rental", "levy", "deposit", "yield", "escalation", "rates", "purchase price", "%", "$", "zar"),
-        "p2_title": "Lease, Occupation & Transfer Conditions",
-        "p2_keys": ("occupation", "inspection", "zoning", "maintenance", "notice", "transfer", "handover", "renewal", "municipal", "mandatory"),
-        "p3_title": "Title, Zoning & Default Exposures",
-        "p3_keys": ("encumbrance", "default", "forfeiture", "structural", "compliance", "eviction", "breach", "defect", "servitude", "penalty"),
-        "focus": "rental/valuation figures, transfer and maintenance obligations, and title or default risks"
+        "p2_title": "Lease & Transfer Conditions",
+        "p2_keys": ("occupation", "inspection", "zoning", "maintenance", "notice", "transfer", "handover", "renewal", "mandatory"),
+        "p3_title": "Title, Zoning & Default Risks",
+        "p3_keys": ("encumbrance", "default", "forfeiture", "structural", "compliance", "eviction", "breach", "defect", "penalty"),
+        "summary": "Adaptive property synthesis isolates rental/valuation figures, transfer obligations, and title or default risks."
     },
     "Enterprise Systems & Engineering": {
-        "detect_words": ("architecture", "pipeline", "api", "latency", "schema", "sap", "datasphere", "deployment", "server", "bandwidth", "specification", "integration", "database"),
-        "p1_title": "Resource Budgets, SLAs & Capacity Metrics",
+        "detect": ("architecture", "pipeline", "api", "latency", "schema", "sap", "datasphere", "deployment", "server", "specification", "integration"),
+        "p1_title": "Resource Budgets & SLA Metrics",
         "p1_keys": ("sla", "uptime", "latency", "throughput", "budget", "license", "cost", "capacity", "gb", "tb", "%", "$", "zar"),
-        "p2_title": "System Architecture & Deployment Mandates",
-        "p2_keys": ("protocol", "pipeline", "schema", "integration", "authentication", "encryption", "schedule", "workflow", "mandatory", "step"),
-        "p3_title": "Security, Downtime & Bottleneck Risks",
-        "p3_keys": ("vulnerability", "downtime", "bottleneck", "failure", "breach", "compliance", "deprecated", "timeout", "risk", "loss"),
-        "focus": "SLA/capacity benchmarks, core integration mandates, and architectural bottleneck or security risks"
+        "p2_title": "Architecture & Deployment Mandates",
+        "p2_keys": ("protocol", "pipeline", "schema", "integration", "authentication", "encryption", "schedule", "workflow", "mandatory"),
+        "p3_title": "Security & Bottleneck Risks",
+        "p3_keys": ("vulnerability", "downtime", "bottleneck", "failure", "breach", "compliance", "timeout", "risk", "loss"),
+        "summary": "Adaptive systems synthesis isolates SLA/capacity benchmarks, integration mandates, and bottleneck or security risks."
     },
     "Corporate Finance & Operations": {
-        "detect_words": ("revenue", "ebitda", "profit", "margin", "audit", "expenditure", "shareholder", "balance sheet", "cash flow", "fiscal", "quarterly", "kpi"),
-        "p1_title": "Financial Metrics & Capital Allocation",
+        "detect": ("revenue", "ebitda", "profit", "margin", "audit", "expenditure", "shareholder", "balance sheet", "cash flow", "fiscal", "kpi"),
+        "p1_title": "Financial Metrics",
         "p1_keys": ("revenue", "profit", "margin", "expenditure", "ebitda", "cash flow", "budget", "roi", "valuation", "%", "$", "zar"),
-        "p2_title": "Operational Directives & Governance",
-        "p2_keys": ("protocol", "rule", "schedule", "mandatory", "step", "policy", "governance", "audit", "target", "timeline"),
-        "p3_title": "Critical Liabilities & Compliance Risks",
-        "p3_keys": ("liability", "breach", "damage", "nda", "compliance", "penalty", "exposure", "deficit", "loss", "fraud"),
-        "focus": "core financial performance drivers, mandatory operational governance, and critical compliance liabilities"
+        "p2_title": "Operational Directives",
+        "p2_keys": ("protocol", "rule", "schedule", "mandatory", "step", "policy", "governance", "audit", "target"),
+        "p3_title": "Critical Risks",
+        "p3_keys": ("liability", "breach", "damage", "nda", "compliance", "penalty", "exposure", "deficit", "loss"),
+        "summary": "Executive synthesis confirms core financial structures, mandatory operational protocols, and potential compliance liabilities."
     }
 }
 
-# --- 4. CORE ENGINE BLOCK (100% IN-MEMORY RAM + TABLE EXTRACTION) ---
-def xml_safe(text):
-    return html.escape(str(text), quote=False)
-
-def extract_segments_from_bytes(file_bytes, filename):
-    parts = filename.split('.')
-    ext = parts.pop().lower() if len(parts) > 1 else ""
-    segments = []
+# --- 4. SIMPLE, RELIABLE EXTRACTION (ORIGINAL STYLE) ---
+def read_single_file(file_bytes, filename):
+    ext = filename.split('.').pop().lower()
     short_name = filename.split('/').pop()
-    scanned_pages = 0
-    try:
-        if ext == "pdf":
-            reader = pypdf.PdfReader(io.BytesIO(file_bytes))
-            for idx, page in enumerate(reader.pages, start=1):
-                extracted = page.extract_text()
-                if extracted and extracted.strip():
-                    segments.append({
-                        "text": extracted,
-                        "source": f"{short_name} | Page {idx}"
-                    })
-                else:
-                    scanned_pages += 1
-        elif ext == "docx":
-            doc = docx.Document(io.BytesIO(file_bytes))
-            para_lines = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
-            if para_lines:
-                segments.append({
-                    "text": "\n".join(para_lines),
-                    "source": f"{short_name} | Body Text"
-                })
-            for t_idx, table in enumerate(doc.tables, start=1):
-                row_sentences = []
-                for row in table.rows:
-                    cells = [c.text.strip().replace("\n", " ") for c in row.cells if c.text.strip()]
+    chunks = list()
+
+    if ext == "pdf":
+        reader = pypdf.PdfReader(io.BytesIO(file_bytes))
+        for page_num, page in enumerate(reader.pages, start=1):
+            txt = page.extract_text()
+            if txt and txt.strip():
+                chunks.append((txt, f"{short_name} | Page {page_num}"))
+
+    elif ext == "docx":
+        doc = docx.Document(io.BytesIO(file_bytes))
+        body_text = ""
+        for p in doc.paragraphs:
+            if p.text.strip():
+                body_text += p.text.strip() + "\n"
+        for table in doc.tables:
+            for row in table.rows:
+                row_text = " - ".join(c.text.strip() for c in row.cells if c.text.strip())
+                if row_text:
+                    body_text += row_text + ".\n"
+        if body_text.strip():
+            chunks.append((body_text, short_name))
+
+    elif ext == "txt":
+        txt = file_bytes.decode("utf-8", errors="ignore")
+        if txt.strip():
+            chunks.append((txt, short_name))
+
+    return chunks
+
+def extract_all(uploaded_file):
+    raw_bytes = uploaded_file.read()
+    ext = uploaded_file.name.split('.').pop().lower()
+    all_chunks = list()
+    file_count = 0
+
+    if ext == "zip":
+        with zipfile.ZipFile(io.BytesIO(raw_bytes)) as z:
+            for name in z.namelist():
+                if not name.endswith('/') and not name.startswith('__MACOSX'):
+                    try:
+                        file_chunks = read_single_file(z.read(name), name)
+                        if file_chunks:
+                            all_chunks.extend(file_chunks)
+                            file_count += 1
+                    except Exception:
+                        pass
+    else:
+        try:
+            all_chunks = read_single_file(raw_bytes, uploaded_file.name)
+            file_count = 1
+        except Exception:
+            pass
+
+    return all_chunks, file_count
+
+def detect_domain(full_text):
+    lower = full_text.lower()
+    best_domain = "Corporate Finance & Operations"
+    best_score = 0
+    for domain, cfg in DOMAIN_PROFILES.items():
+        score = sum(lower.count(w) for w in cfg.get("detect", ()))
+        if score > best_score:
+            best_score = score
+            best_domain = domain
+    return best_domain
+
+def filter_signals(chunks, keywords):
+    results = list()
+    seen = set()
+    rand_check = re.compile(r'\bR\s?\d[\d,\.]*')
+
+    for text_block, source_label in chunks:
+        clean_text = re.sub(r'\s+', ' ', text_block)
+        sentences = re.split(r'(?<=[.!?])\s+', clean_text)
+        for s in sentences:
+            s_clean = s.strip()
+            if len(s_clean) < 35 or len(s_clean) > 450:
+                continue
+            s_low = s_clean.lower()
+            matched = any(k in s_low for k in keywords)
+            if not matched and rand_check.search(s_clean) and "zar" in keywords:
+                matched = True
+            if matched and s_clean not in seen:
+                seen.add(s_clean)
+                results.append((s_clean, source_label))
+                if len(results) == 6:
+                    return results
+    return results
+
