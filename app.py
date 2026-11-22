@@ -142,47 +142,45 @@ def build_report(fmt, name, labels, tags, p1_data, p2_data, p3_data):
     p_doc.build(ctx)
     return out.getvalue()
 
+def render_dashboard(filename):
+    cfg = PROFILES.get(st.session_state.active_profile)
+    l1, l2, l3 = cfg.get("labels")
+    t1, t2, t3 = cfg.get("tags")
+
+    st.subheader("📋 Executive Intelligence Summary")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown(f"#### {l1}")
+        for i in st.session_state.fin:
+            st.markdown(f"<div class='metric-box'><b>[{t1}]</b> {i}</div>", unsafe_allow_html=True)
+        st.markdown(f"#### {l2}")
+        for i in st.session_state.ops:
+            st.markdown(f"<div class='metric-box'><b>[{t2}]</b> {i}</div>", unsafe_allow_html=True)
+    with c2:
+        st.markdown(f"#### {l3}")
+        for i in st.session_state.rsk:
+            st.markdown(f"<div class='risk-box'><b>[{t3}]</b> {i}</div>", unsafe_allow_html=True)
+
+    chart_data = pd.DataFrame({
+        "Metrics": list((t1, t2, t3)),
+        "Count": list((len(st.session_state.fin), len(st.session_state.ops), len(st.session_state.rsk)))
+    })
+    st.bar_chart(chart_data, x="Metrics", y="Count", use_container_width=True)
+    st.markdown("---")
+
+    st.subheader("📥 Export Intelligence Report Hub")
+    fmt_choices = list(("Portable Document Format (.pdf)", "Microsoft Word (.docx)", "Plain Text Document (.txt)"))
+    fmt = st.selectbox("Select Export Format Preference:", fmt_choices)
+    ext_m = "pdf" if "pdf" in fmt else "docx" if "docx" in fmt else "txt"
+
+    st.download_button(
+        label=f"📥 Download Summary Report (.{ext_m})",
+        data=build_report(ext_m, filename, cfg.get("labels"), cfg.get("tags"), st.session_state.fin, st.session_state.ops, st.session_state.rsk),
+        file_name=f"Intel_Report_{filename}.{ext_m}",
+        mime=f"application/{ext_m}" if ext_m != "txt" else "text/plain"
+    )
+
 st.markdown("# 💎 Limitless Blue | Enterprise Document Intelligence Engine")
 st.markdown("### Secure, localized data extraction for corporate, medical, property, and legal compliance evaluation.")
 st.markdown("---")
 
-uploaded_file = st.file_uploader("Upload Corporate File (PDF, DOCX, TXT, or ZIP)", type=list(("pdf", "docx", "txt", "zip")))
-
-if "fin" not in st.session_state:
-    st.session_state.fin = list()
-    st.session_state.ops = list()
-    st.session_state.rsk = list()
-    st.session_state.active_fn = None
-    st.session_state.active_profile = "Corporate Finance & Operations"
-
-if uploaded_file:
-    if st.session_state.active_fn != uploaded_file.name:
-        file_bytes = uploaded_file.getvalue()
-        txt = ""
-        ext = uploaded_file.name.split(".").pop().lower()
-        if ext == "zip":
-            with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
-                for info in z.infolist():
-                    if not info.filename.startswith("__MACOSX/") and not info.is_dir():
-                        inner_ext = info.filename.split(".").pop().lower()
-                        with z.open(info) as f:
-                            txt += extract_text(f.read(), inner_ext) + "\n"
-        else:
-            txt = extract_text(file_bytes, ext)
-
-        if txt.strip():
-            profile_name = detect_profile(txt)
-            cfg = PROFILES.get(profile_name)
-            sentences = re.split(r'(?<=[\.!?])\s+', txt)
-
-            st.session_state.fin = filter_sentences(sentences, cfg.get("p1"))
-            st.session_state.ops = filter_sentences(sentences, cfg.get("p2"))
-            st.session_state.rsk = filter_sentences(sentences, cfg.get("p3"))
-            st.session_state.active_fn = uploaded_file.name
-            st.session_state.active_profile = profile_name
-            st.success(f"Successfully analyzed: {uploaded_file.name}  |  {profile_name}")
-        else:
-            st.warning("No readable text discovered in file contents.")
-            st.session_state.active_fn = None
-
-    if st.session_state.active_fn:
