@@ -10,13 +10,10 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 import zipfile
 
-st.set_page_config(page_title="Limitless Blue AI", page_icon="🔷", layout="wide")
+st.set_page_config(page_title="Limitless Blue AI", page_icon="💎", layout="wide")
 
 st.markdown("""
     <style>
-    header[data-testid="stHeader"] { display: none; }
-    #MainMenu { visibility: hidden; }
-    footer { visibility: hidden; }
     h1 { color: #4e8cff; font-family: 'Helvetica Neue', sans-serif; font-weight: 700; }
     h3 { color: var(--text-color); font-weight: 400; opacity: 0.8; }
     h4 { color: var(--text-color); border-bottom: 2px solid #1d4ed8; padding-bottom: 6px; margin-top: 15px; }
@@ -82,16 +79,17 @@ def detect_profile(text):
             best_name = name
     return best_name
 
-def extract_text(f_obj, ext):
+def extract_text(raw_bytes, ext):
     if ext == "pdf":
         parts = list()
-        for p in PdfReader(f_obj).pages:
+        reader = PdfReader(io.BytesIO(raw_bytes))
+        for p in reader.pages:
             parts.append(p.extract_text() or "")
         return "".join(parts)
     if ext == "docx":
-        return docx2txt.process(f_obj)
+        return docx2txt.process(io.BytesIO(raw_bytes))
     if ext == "txt":
-        return f_obj.read().decode("utf-8", errors="ignore")
+        return raw_bytes.decode("utf-8", errors="ignore")
     return ""
 
 def filter_sentences(sentences, keywords):
@@ -144,16 +142,11 @@ def build_report(fmt, name, labels, tags, p1_data, p2_data, p3_data):
     p_doc.build(ctx)
     return out.getvalue()
 
-st.markdown("# 🔷 Limitless Blue | Enterprise Document Intelligence Engine")
+st.markdown("# 💎 Limitless Blue | Enterprise Document Intelligence Engine")
 st.markdown("### Secure, localized data extraction for corporate, medical, property, and legal compliance evaluation.")
 st.markdown("---")
 
-c_up, c_mode = st.columns(list((3, 1)))
-with c_up:
-    uploaded_file = st.file_uploader("Upload Corporate File (PDF, DOCX, TXT, or ZIP)", type=list(("pdf", "docx", "txt", "zip")))
-with c_mode:
-    mode_options = list(("Auto-Detect",)) + list(PROFILES.keys())
-    selected_mode = st.selectbox("Industry Lens", mode_options)
+uploaded_file = st.file_uploader("Upload Corporate File (PDF, DOCX, TXT, or ZIP)", type=list(("pdf", "docx", "txt", "zip")))
 
 if "fin" not in st.session_state:
     st.session_state.fin = list()
@@ -163,25 +156,33 @@ if "fin" not in st.session_state:
     st.session_state.active_profile = "Corporate Finance & Operations"
 
 if uploaded_file:
-    cache_id = f"{uploaded_file.name}_{selected_mode}"
-    if st.session_state.active_fn != cache_id:
+    if st.session_state.active_fn != uploaded_file.name:
+        file_bytes = uploaded_file.getvalue()
         txt = ""
         ext = uploaded_file.name.split(".").pop().lower()
         if ext == "zip":
-            with zipfile.ZipFile(uploaded_file) as z:
+            with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
                 for info in z.infolist():
                     if not info.filename.startswith("__MACOSX/") and not info.is_dir():
                         inner_ext = info.filename.split(".").pop().lower()
                         with z.open(info) as f:
-                            data_stream = io.BytesIO(f.read()) if inner_ext != "txt" else f
-                            txt += extract_text(data_stream, inner_ext) + "\n"
+                            txt += extract_text(f.read(), inner_ext) + "\n"
         else:
-            txt = extract_text(uploaded_file, ext)
+            txt = extract_text(file_bytes, ext)
 
         if txt.strip():
-            profile_name = detect_profile(txt) if selected_mode == "Auto-Detect" else selected_mode
+            profile_name = detect_profile(txt)
             cfg = PROFILES.get(profile_name)
             sentences = re.split(r'(?<=[\.!?])\s+', txt)
 
             st.session_state.fin = filter_sentences(sentences, cfg.get("p1"))
             st.session_state.ops = filter_sentences(sentences, cfg.get("p2"))
+            st.session_state.rsk = filter_sentences(sentences, cfg.get("p3"))
+            st.session_state.active_fn = uploaded_file.name
+            st.session_state.active_profile = profile_name
+            st.success(f"Successfully analyzed: {uploaded_file.name}  |  {profile_name}")
+        else:
+            st.warning("No readable text discovered in file contents.")
+            st.session_state.active_fn = None
+
+    if st.session_state.active_fn:
