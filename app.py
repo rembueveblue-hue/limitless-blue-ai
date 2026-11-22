@@ -10,10 +10,13 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 import zipfile
 
-st.set_page_config(page_title="Limitless Blue AI", page_icon="💎", layout="wide")
+st.set_page_config(page_title="Limitless Blue AI", page_icon="🔷", layout="wide")
 
 st.markdown("""
     <style>
+    header[data-testid="stHeader"] { display: none; }
+    #MainMenu { visibility: hidden; }
+    footer { visibility: hidden; }
     h1 { color: #4e8cff; font-family: 'Helvetica Neue', sans-serif; font-weight: 700; }
     h3 { color: var(--text-color); font-weight: 400; opacity: 0.8; }
     h4 { color: var(--text-color); border-bottom: 2px solid #1d4ed8; padding-bottom: 6px; margin-top: 15px; }
@@ -23,164 +26,119 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-PROFILES = {
-    "Corporate Finance & Operations": {
-        "detect": ("revenue", "profit", "expenditure", "margin", "ebitda", "audit", "fiscal", "shareholder"),
-        "labels": ("Financial Metrics & Performance", "Strategic & Operational Directives", "Legal Liabilities & Risk Assessment"),
-        "tags": ("FINANCIAL", "OPERATIONS", "CRITICAL RISK"),
-        "p1": ("$", "zar", "revenue", "profit", "expenditure", "cost", "margin", "budget", "fee", "%"),
-        "p2": ("protocol", "tenet", "must", "extract", "auth", "step", "schedul", "scrub", "mandatory", "rule"),
-        "p3": ("liabilit", "breach", "damages", "nondisclosure", "nda", "comply", "compliance", "restrict", "penalty")
-    },
-    "Healthcare & Medical Aid": {
-        "detect": ("patient", "diagnosis", "clinical", "medical aid", "scheme", "tariff", "co-payment", "pmb", "hospital", "claim"),
-        "labels": ("Benefit Limits, Tariffs & Co-Payments", "Clinical & Pre-Authorization Protocols", "Exclusions & Compliance Risks"),
-        "tags": ("BENEFIT / TARIFF", "CLINICAL PROTOCOL", "EXCLUSION / RISK"),
-        "p1": ("$", "zar", "tariff", "limit", "co-payment", "levy", "benefit", "premium", "contribution", "cost", "%"),
-        "p2": ("protocol", "authorization", "pre-auth", "pmb", "referral", "dosage", "treatment", "guideline", "mandatory", "rule"),
-        "p3": ("exclusion", "waiting period", "penalty", "rejection", "breach", "liabilit", "compliance", "fraud", "dispute")
-    },
-    "Legal & Regulatory Contracts": {
-        "detect": ("plaintiff", "defendant", "clause", "indemnity", "jurisdiction", "arbitration", "hereby", "termination", "agreement", "statute"),
-        "labels": ("Commercial Stakes, Fees & Liability Caps", "Binding Obligations & Deadlines", "Indemnity, Breach & Termination Traps"),
-        "tags": ("COMMERCIAL / FEE", "OBLIGATION", "LEGAL TRAP"),
-        "p1": ("$", "zar", "fee", "retainer", "damages", "cap", "settlement", "compensation", "invoice", "payment", "%"),
-        "p2": ("shall", "notice", "deliverable", "days", "governing law", "jurisdiction", "obligation", "schedul", "mandatory"),
-        "p3": ("indemnit", "breach", "termination", "arbitration", "nda", "liabilit", "default", "penalty", "dispute")
-    },
-    "Real Estate & Property": {
-        "detect": ("lease", "tenant", "landlord", "escrow", "deed", "zoning", "valuation", "mortgage", "erf", "sectional title", "premises"),
-        "labels": ("Valuations, Rentals & Levies", "Lease & Transfer Conditions", "Title, Zoning & Default Risks"),
-        "tags": ("VALUATION / LEVY", "LEASE CONDITION", "PROPERTY RISK"),
-        "p1": ("$", "zar", "valuation", "rent", "rental", "levy", "deposit", "yield", "escalation", "rates", "purchase price", "%"),
-        "p2": ("occupation", "inspection", "zoning", "maintenance", "notice", "transfer", "handover", "renewal", "mandatory"),
-        "p3": ("encumbrance", "default", "forfeiture", "structural", "compliance", "eviction", "breach", "defect", "penalty")
-    },
-    "Enterprise Systems & Engineering": {
-        "detect": ("architecture", "pipeline", "api", "latency", "schema", "sap", "datasphere", "deployment", "server", "specification", "integration"),
-        "labels": ("Resource Budgets & SLA Metrics", "Architecture & Deployment Mandates", "Security & Bottleneck Risks"),
-        "tags": ("SLA / CAPACITY", "SYSTEM MANDATE", "TECH RISK"),
-        "p1": ("$", "zar", "sla", "uptime", "latency", "throughput", "budget", "license", "cost", "capacity", "gb", "tb", "%"),
-        "p2": ("protocol", "pipeline", "schema", "integration", "authentication", "encryption", "schedul", "workflow", "mandatory"),
-        "p3": ("vulnerabilit", "downtime", "bottleneck", "failure", "breach", "compliance", "timeout", "risk", "loss")
-    }
-}
-
-def detect_profile(text):
-    low = text.lower()
-    best_name = "Corporate Finance & Operations"
-    best_hits = 0
-    for name, cfg in PROFILES.items():
-        hits = 0
-        for w in cfg.get("detect", ()):
-            hits += low.count(w)
-        if hits > best_hits:
-            best_hits = hits
-            best_name = name
-    return best_name
-
-def extract_text(raw_bytes, ext):
-    if ext == "pdf":
-        parts = list()
-        reader = PdfReader(io.BytesIO(raw_bytes))
-        for p in reader.pages:
-            parts.append(p.extract_text() or "")
-        return "".join(parts)
-    if ext == "docx":
-        return docx2txt.process(io.BytesIO(raw_bytes))
-    if ext == "txt":
-        return raw_bytes.decode("utf-8", errors="ignore")
-    return ""
-
-def filter_sentences(sentences, keywords):
-    found = list()
-    seen = set()
-    for s in sentences:
-        s_clean = s.strip()
-        if len(s_clean) > 15 and s_clean not in seen:
-            s_low = s_clean.lower()
-            for k in keywords:
-                if k in s_low:
-                    seen.add(s_clean)
-                    found.append(s_clean)
-                    break
-        if len(found) == 5:
-            break
-    return found
-
-def build_report(fmt, name, labels, tags, p1_data, p2_data, p3_data):
-    t1, t2, t3 = tags
-    l1, l2, l3 = labels
+# Isolated data compilation engine prevents document generation faults on web links
+def build_report(fmt, name, fin_data, ops_data, rsk_data):
     if "txt" in fmt:
-        rep = f"LIMITLESS BLUE RECAP:\n{name.upper()}\n" + "=" * 50 + "\n\n"
-        rep += f"[{t1}]\n" + "\n".join(f"- {f}" for f in p1_data) + "\n\n"
-        rep += f"[{t2}]\n" + "\n".join(f"- {o}" for o in p2_data) + "\n\n"
-        rep += f"[{t3}]\n" + "\n".join(f"- {r}" for r in p3_data)
-        return rep.encode("utf-8")
-    if "docx" in fmt:
+        rep = f"LIMITLESS BLUE RECAP:\n{name.upper()}\n" + "="*50 + "\n\n"
+        rep += "[FINANCIAL & COMMERCIAL METRICS]\n" + "\n".join(f"- {f}" for f in fin_data) + "\n\n"
+        rep += "[OPERATIONAL & CLINICAL DIRECTIVES]\n" + "\n".join(f"- {o}" for o in ops_data) + "\n\n"
+        rep += "[CRITICAL LIABILITIES & RISKS]\n" + "\n".join(f"- {r}" for r in rsk_data)
+        return rep.encode('utf-8')
+    elif "docx" in fmt:
         doc = Document()
         doc.add_heading("Summary Intelligence Report", 0)
-        for title, dataset in ((l1, p1_data), (l2, p2_data), (l3, p3_data)):
+        for title, dataset in (("Financial & Commercial Metrics", fin_data), ("Operational & Clinical Directives", ops_data), ("Liabilities, Exclusions & Risk Assessment", rsk_data)):
             doc.add_heading(title, level=1)
             for item in dataset:
-                doc.add_paragraph(item, style="List Bullet")
+                doc.add_paragraph(item, style='List Bullet')
         out = io.BytesIO()
         doc.save(out)
         return out.getvalue()
-    out = io.BytesIO()
-    p_doc = SimpleDocTemplate(out, pagesize=letter, title="Review")
-    stls = getSampleStyleSheet()
-    ctx = list()
-    ctx.append(Paragraph("<font size=22 color='#1d4ed8'><b>Limitless Blue Executive Report</b></font>", stls.byName.get("Title")))
-    ctx.append(Spacer(1, 15))
-    for h, c, l in ((l1, "#1e3a8a", p1_data), (l2, "#1e3a8a", p2_data), (l3, "#7f1d1d", p3_data)):
-        ctx.append(Paragraph(f"<font size=14 color='{c}'><b>{h}</b></font>", stls.byName.get("Heading2")))
-        for item in l:
-            safe_item = item.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-            ctx.append(Paragraph(f"• {safe_item}", stls.byName.get("Normal")))
-        ctx.append(Spacer(1, 10))
-    p_doc.build(ctx)
-    return out.getvalue()
+    else:
+        out = io.BytesIO()
+        p_doc = SimpleDocTemplate(out, pagesize=letter, title="Review")
+        stls = getSampleStyleSheet()
+        ctx = list((Paragraph("<font size=22 color='#1d4ed8'><b>Limitless Blue Executive Report</b></font>", stls.byName.get('Title')), Spacer(1, 15)))
+        for h, c, l in (("Financial & Commercial Metrics", "#1e3a8a", fin_data), ("Operational & Clinical Directives", "#1e3a8a", ops_data), ("Liabilities, Exclusions & Risk Assessment", "#7f1d1d", rsk_data)):
+            ctx.append(Paragraph(f"<font size=14 color='{c}'><b>{h}</b></font>", stls.byName.get('Heading2')))
+            for item in l:
+                ctx.append(Paragraph(f"• {item}", stls.byName.get('Normal')))
+            ctx.append(Spacer(1, 10))
+        p_doc.build(ctx)
+        return out.getvalue()
 
-def render_dashboard(filename):
-    cfg = PROFILES.get(st.session_state.active_profile)
-    l1, l2, l3 = cfg.get("labels")
-    t1, t2, t3 = cfg.get("tags")
-
-    st.subheader("📋 Executive Intelligence Summary")
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown(f"#### {l1}")
-        for i in st.session_state.fin:
-            st.markdown(f"<div class='metric-box'><b>[{t1}]</b> {i}</div>", unsafe_allow_html=True)
-        st.markdown(f"#### {l2}")
-        for i in st.session_state.ops:
-            st.markdown(f"<div class='metric-box'><b>[{t2}]</b> {i}</div>", unsafe_allow_html=True)
-    with c2:
-        st.markdown(f"#### {l3}")
-        for i in st.session_state.rsk:
-            st.markdown(f"<div class='risk-box'><b>[{t3}]</b> {i}</div>", unsafe_allow_html=True)
-
-    chart_data = pd.DataFrame({
-        "Metrics": list((t1, t2, t3)),
-        "Count": list((len(st.session_state.fin), len(st.session_state.ops), len(st.session_state.rsk)))
-    })
-    st.bar_chart(chart_data, x="Metrics", y="Count", use_container_width=True)
-    st.markdown("---")
-
-    st.subheader("📥 Export Intelligence Report Hub")
-    fmt_choices = list(("Portable Document Format (.pdf)", "Microsoft Word (.docx)", "Plain Text Document (.txt)"))
-    fmt = st.selectbox("Select Export Format Preference:", fmt_choices)
-    ext_m = "pdf" if "pdf" in fmt else "docx" if "docx" in fmt else "txt"
-
-    st.download_button(
-        label=f"📥 Download Summary Report (.{ext_m})",
-        data=build_report(ext_m, filename, cfg.get("labels"), cfg.get("tags"), st.session_state.fin, st.session_state.ops, st.session_state.rsk),
-        file_name=f"Intel_Report_{filename}.{ext_m}",
-        mime=f"application/{ext_m}" if ext_m != "txt" else "text/plain"
-    )
-
-st.markdown("# 💎 Limitless Blue | Enterprise Document Intelligence Engine")
-st.markdown("### Secure, localized data extraction for corporate, medical, property, and legal compliance evaluation.")
+st.markdown("# 🔷 Limitless Blue | Enterprise Document Intelligence Engine")
+st.markdown("### Secure, localized data extraction for corporate and legal compliance evaluation.")
 st.markdown("---")
 
+uploaded_file = st.file_uploader("Upload Corporate File (PDF, DOCX, TXT, or ZIP)", type=list(("pdf", "docx", "txt", "zip")))
+
+# Persistent state initialization ensures steady execution loops across user selections
+if "fin" not in st.session_state:
+    st.session_state.fin = list()
+    st.session_state.ops = list()
+    st.session_state.rsk = list()
+    st.session_state.active_fn = None
+
+if uploaded_file:
+    if st.session_state.active_fn != uploaded_file.name:
+        txt, ext = "", uploaded_file.name.split(".").pop().lower()
+        try:
+            def extract(f_obj, e):
+                if e == "pdf":
+                    return "".join(p.extract_text() or "" for p in PdfReader(f_obj).pages)
+                if e == "docx":
+                    return docx2txt.process(f_obj)
+                if e == "txt":
+                    return f_obj.read().decode("utf-8")
+                return ""
+            
+            if ext == "zip":
+                with zipfile.ZipFile(uploaded_file) as z:
+                    for info in z.infolist():
+                        if not info.filename.startswith('__MACOSX/') and not info.is_dir():
+                            inner_ext = info.filename.split(".").pop().lower()
+                            with z.open(info) as f:
+                                txt += extract(io.BytesIO(f.read()) if inner_ext != "txt" else f, inner_ext) + "\n"
+            else:
+                txt = extract(uploaded_file, ext)
+                
+            if txt.strip():
+                sentences = re.split(r'(?<=[\.!?])\s+', txt)
+                k1 = ("$", "zar", "r ", "revenue", "profit", "expenditure", "cost", "margin", "budget", "fee", "tariff", "limit", "co-payment", "benefit", "premium", "rent", "levy", "valuation", "sla", "%")
+                k2 = ("protocol", "tenet", "must", "extract", "auth", "authorization", "step", "schedul", "scrub", "mandatory", "rule", "shall", "notice", "deliverable", "pmb", "treatment", "zoning", "transfer", "pipeline", "schema")
+                k3 = ("liabilit", "breach", "damages", "nondisclosure", "nda", "comply", "compliance", "restrict", "penalty", "exclusion", "waiting period", "rejection", "indemnit", "termination", "arbitration", "default", "encumbrance", "forfeiture", "vulnerabilit", "downtime")
+
+                st.session_state.fin = list(set(s.strip() for s in sentences if any(k in s.lower() for k in k1) and len(s.strip()) > 15))[:5]
+                st.session_state.ops = list(set(s.strip() for s in sentences if any(k in s.lower() for k in k2) and len(s.strip()) > 15))[:5]
+                st.session_state.rsk = list(set(s.strip() for s in sentences if any(k in s.lower() for k in k3) and len(s.strip()) > 15))[:5]
+                st.session_state.active_fn = uploaded_file.name
+                st.success(f"Successfully analyzed: {uploaded_file.name}")
+            else:
+                st.warning("No readable text discovered in file contents.")
+                st.session_state.active_fn = None
+        except Exception as e:
+            st.error(f"Parsing Error: {e}")
+            st.session_state.active_fn = None
+
+    # Steady UI layout draws from cached computations without repeating extract sweeps
+    if st.session_state.active_fn:
+        st.subheader("📋 Executive Intelligence Summary")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("#### Financial & Commercial Metrics")
+            for i in st.session_state.fin:
+                st.markdown(f"<div class='metric-box'><b>[METRIC]</b> {i}</div>", unsafe_allow_html=True)
+            st.markdown("#### Operational & Clinical Directives")
+            for i in st.session_state.ops:
+                st.markdown(f"<div class='metric-box'><b>[DIRECTIVE]</b> {i}</div>", unsafe_allow_html=True)
+        with c2:
+            st.markdown("#### Legal Liabilities & Risk Assessment")
+            for i in st.session_state.rsk:
+                st.markdown(f"<div class='risk-box'><b>[CRITICAL RISK]</b> {i}</div>", unsafe_allow_html=True)
+            
+        st.bar_chart(pd.DataFrame({"Metrics": list(("Metrics", "Directives", "Risks")), "Count": list((len(st.session_state.fin), len(st.session_state.ops), len(st.session_state.rsk)))}), x="Metrics", y="Count", use_container_width=True)
+        st.markdown("---")
+        
+        st.subheader("📥 Export Intelligence Report Hub")
+        fmt = st.selectbox("Select Export Format Preference:", list(("Portable Document Format (.pdf)", "Microsoft Word (.docx)", "Plain Text Document (.txt)")))
+        ext_m = "pdf" if "pdf" in fmt else "docx" if "docx" in fmt else "txt"
+        
+        st.download_button(
+            label=f"📥 Download Summary Report (.{ext_m})", 
+            data=build_report(ext_m, uploaded_file.name, st.session_state.fin, st.session_state.ops, st.session_state.rsk), 
+            file_name=f"Intel_Report_{uploaded_file.name}.{ext_m}", 
+            mime=f"application/{ext_m}" if ext_m != "txt" else "text/plain"
+        )
+else:
+    st.session_state.fin, st.session_state.ops, st.session_state.rsk, st.session_state.active_fn = list(), list(), list(), None
