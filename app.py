@@ -119,7 +119,7 @@ def build_report(fmt, name, labels, tags, p1_data, p2_data, p3_data):
         rep += f"[{t2}]\n" + "\n".join(f"- {o}" for o in p2_data) + "\n\n"
         rep += f"[{t3}]\n" + "\n".join(f"- {r}" for r in p3_data)
         return rep.encode("utf-8")
-    elif "docx" in fmt:
+    if "docx" in fmt:
         doc = Document()
         doc.add_heading("Summary Intelligence Report", 0)
         for title, dataset in ((l1, p1_data), (l2, p2_data), (l3, p3_data)):
@@ -129,21 +129,20 @@ def build_report(fmt, name, labels, tags, p1_data, p2_data, p3_data):
         out = io.BytesIO()
         doc.save(out)
         return out.getvalue()
-    else:
-        out = io.BytesIO()
-        p_doc = SimpleDocTemplate(out, pagesize=letter, title="Review")
-        stls = getSampleStyleSheet()
-        ctx = list()
-        ctx.append(Paragraph("<font size=22 color='#1d4ed8'><b>Limitless Blue Executive Report</b></font>", stls.byName.get("Title")))
-        ctx.append(Spacer(1, 15))
-        for h, c, l in ((l1, "#1e3a8a", p1_data), (l2, "#1e3a8a", p2_data), (l3, "#7f1d1d", p3_data)):
-            ctx.append(Paragraph(f"<font size=14 color='{c}'><b>{h}</b></font>", stls.byName.get("Heading2")))
-            for item in l:
-                safe_item = item.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                ctx.append(Paragraph(f"• {safe_item}", stls.byName.get("Normal")))
-            ctx.append(Spacer(1, 10))
-        p_doc.build(ctx)
-        return out.getvalue()
+    out = io.BytesIO()
+    p_doc = SimpleDocTemplate(out, pagesize=letter, title="Review")
+    stls = getSampleStyleSheet()
+    ctx = list()
+    ctx.append(Paragraph("<font size=22 color='#1d4ed8'><b>Limitless Blue Executive Report</b></font>", stls.byName.get("Title")))
+    ctx.append(Spacer(1, 15))
+    for h, c, l in ((l1, "#1e3a8a", p1_data), (l2, "#1e3a8a", p2_data), (l3, "#7f1d1d", p3_data)):
+        ctx.append(Paragraph(f"<font size=14 color='{c}'><b>{h}</b></font>", stls.byName.get("Heading2")))
+        for item in l:
+            safe_item = item.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            ctx.append(Paragraph(f"• {safe_item}", stls.byName.get("Normal")))
+        ctx.append(Spacer(1, 10))
+    p_doc.build(ctx)
+    return out.getvalue()
 
 st.markdown("# 🔷 Limitless Blue | Enterprise Document Intelligence Engine")
 st.markdown("### Secure, localized data extraction for corporate, medical, property, and legal compliance evaluation.")
@@ -168,20 +167,21 @@ if uploaded_file:
     if st.session_state.active_fn != cache_id:
         txt = ""
         ext = uploaded_file.name.split(".").pop().lower()
-        try:
-            if ext == "zip":
-                with zipfile.ZipFile(uploaded_file) as z:
-                    for info in z.infolist():
-                        if not info.filename.startswith("__MACOSX/") and not info.is_dir():
-                            inner_ext = info.filename.split(".").pop().lower()
-                            with z.open(info) as f:
-                                data_stream = io.BytesIO(f.read()) if inner_ext != "txt" else f
-                                txt += extract_text(data_stream, inner_ext) + "\n"
-            else:
-                txt = extract_text(uploaded_file, ext)
+        if ext == "zip":
+            with zipfile.ZipFile(uploaded_file) as z:
+                for info in z.infolist():
+                    if not info.filename.startswith("__MACOSX/") and not info.is_dir():
+                        inner_ext = info.filename.split(".").pop().lower()
+                        with z.open(info) as f:
+                            data_stream = io.BytesIO(f.read()) if inner_ext != "txt" else f
+                            txt += extract_text(data_stream, inner_ext) + "\n"
+        else:
+            txt = extract_text(uploaded_file, ext)
 
-            if txt.strip():
-                profile_name = detect_profile(txt) if selected_mode == "Auto-Detect" else selected_mode
-                cfg = PROFILES.get(profile_name)
-                sentences = re.split(r'(?<=[\.!?])\s+', txt)
+        if txt.strip():
+            profile_name = detect_profile(txt) if selected_mode == "Auto-Detect" else selected_mode
+            cfg = PROFILES.get(profile_name)
+            sentences = re.split(r'(?<=[\.!?])\s+', txt)
 
+            st.session_state.fin = filter_sentences(sentences, cfg.get("p1"))
+            st.session_state.ops = filter_sentences(sentences, cfg.get("p2"))
