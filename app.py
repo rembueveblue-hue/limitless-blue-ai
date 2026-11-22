@@ -26,7 +26,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Adaptive Industry Profiles (Same 3-pillar engine, tailored labels & keywords per document type)
 PROFILES = {
     "Corporate Finance & Operations": {
         "detect": ("revenue", "profit", "expenditure", "margin", "ebitda", "audit", "fiscal", "shareholder"),
@@ -75,29 +74,58 @@ def detect_profile(text):
     best_name = "Corporate Finance & Operations"
     best_hits = 0
     for name, cfg in PROFILES.items():
-        hits = sum(low.count(w) for w in cfg["detect"])
+        hits = 0
+        for w in cfg.get("detect", ()):
+            hits += low.count(w)
         if hits > best_hits:
             best_hits = hits
             best_name = name
     return best_name
 
-# Isolated data compilation engine prevents document generation faults on web links
+def extract_text(f_obj, ext):
+    if ext == "pdf":
+        parts = list()
+        for p in PdfReader(f_obj).pages:
+            parts.append(p.extract_text() or "")
+        return "".join(parts)
+    if ext == "docx":
+        return docx2txt.process(f_obj)
+    if ext == "txt":
+        return f_obj.read().decode("utf-8", errors="ignore")
+    return ""
+
+def filter_sentences(sentences, keywords):
+    found = list()
+    seen = set()
+    for s in sentences:
+        s_clean = s.strip()
+        if len(s_clean) > 15 and s_clean not in seen:
+            s_low = s_clean.lower()
+            for k in keywords:
+                if k in s_low:
+                    seen.add(s_clean)
+                    found.append(s_clean)
+                    break
+        if len(found) == 5:
+            break
+    return found
+
 def build_report(fmt, name, labels, tags, p1_data, p2_data, p3_data):
     t1, t2, t3 = tags
     l1, l2, l3 = labels
     if "txt" in fmt:
-        rep = f"LIMITLESS BLUE RECAP:\n{name.upper()}\n" + "="*50 + "\n\n"
-        rep += f"[{t1}]\n" + "\n".join([f"- {f}" for f in p1_data]) + "\n\n"
-        rep += f"[{t2}]\n" + "\n".join([f"- {o}" for o in p2_data]) + "\n\n"
-        rep += f"[{t3}]\n" + "\n".join([f"- {r}" for r in p3_data])
-        return rep.encode('utf-8')
+        rep = f"LIMITLESS BLUE RECAP:\n{name.upper()}\n" + "=" * 50 + "\n\n"
+        rep += f"[{t1}]\n" + "\n".join(f"- {f}" for f in p1_data) + "\n\n"
+        rep += f"[{t2}]\n" + "\n".join(f"- {o}" for o in p2_data) + "\n\n"
+        rep += f"[{t3}]\n" + "\n".join(f"- {r}" for r in p3_data)
+        return rep.encode("utf-8")
     elif "docx" in fmt:
         doc = Document()
         doc.add_heading("Summary Intelligence Report", 0)
-        for title, dataset in [(l1, p1_data), (l2, p2_data), (l3, p3_data)]:
+        for title, dataset in ((l1, p1_data), (l2, p2_data), (l3, p3_data)):
             doc.add_heading(title, level=1)
             for item in dataset:
-                doc.add_paragraph(item, style='List Bullet')
+                doc.add_paragraph(item, style="List Bullet")
         out = io.BytesIO()
         doc.save(out)
         return out.getvalue()
@@ -105,12 +133,14 @@ def build_report(fmt, name, labels, tags, p1_data, p2_data, p3_data):
         out = io.BytesIO()
         p_doc = SimpleDocTemplate(out, pagesize=letter, title="Review")
         stls = getSampleStyleSheet()
-        ctx = [Paragraph("<font size=22 color='#1d4ed8'><b>Limitless Blue Executive Report</b></font>", stls['Title']), Spacer(1, 15)]
-        for h, c, l in [(l1, "#1e3a8a", p1_data), (l2, "#1e3a8a", p2_data), (l3, "#7f1d1d", p3_data)]:
-            ctx.append(Paragraph(f"<font size=14 color='{c}'><b>{h}</b></font>", stls['Heading2']))
+        ctx = list()
+        ctx.append(Paragraph("<font size=22 color='#1d4ed8'><b>Limitless Blue Executive Report</b></font>", stls.byName.get("Title")))
+        ctx.append(Spacer(1, 15))
+        for h, c, l in ((l1, "#1e3a8a", p1_data), (l2, "#1e3a8a", p2_data), (l3, "#7f1d1d", p3_data)):
+            ctx.append(Paragraph(f"<font size=14 color='{c}'><b>{h}</b></font>", stls.byName.get("Heading2")))
             for item in l:
                 safe_item = item.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                ctx.append(Paragraph(f"• {safe_item}", stls['Normal']))
+                ctx.append(Paragraph(f"• {safe_item}", stls.byName.get("Normal")))
             ctx.append(Spacer(1, 10))
         p_doc.build(ctx)
         return out.getvalue()
@@ -119,47 +149,39 @@ st.markdown("# 🔷 Limitless Blue | Enterprise Document Intelligence Engine")
 st.markdown("### Secure, localized data extraction for corporate, medical, property, and legal compliance evaluation.")
 st.markdown("---")
 
-c_up, c_mode = st.columns([3, 1])
+c_up, c_mode = st.columns(list((3, 1)))
 with c_up:
-    uploaded_file = st.file_uploader("Upload Corporate File (PDF, DOCX, TXT, or ZIP)", type=["pdf", "docx", "txt", "zip"])
+    uploaded_file = st.file_uploader("Upload Corporate File (PDF, DOCX, TXT, or ZIP)", type=list(("pdf", "docx", "txt", "zip")))
 with c_mode:
-    selected_mode = st.selectbox("Industry Lens", ["Auto-Detect"] + list(PROFILES.keys()))
+    mode_options = list(("Auto-Detect",)) + list(PROFILES.keys())
+    selected_mode = st.selectbox("Industry Lens", mode_options)
 
-# Persistent state initialization ensures steady execution loops across user selections
 if "fin" not in st.session_state:
-    st.session_state.fin = []
-    st.session_state.ops = []
-    st.session_state.rsk = []
+    st.session_state.fin = list()
+    st.session_state.ops = list()
+    st.session_state.rsk = list()
     st.session_state.active_fn = None
     st.session_state.active_profile = "Corporate Finance & Operations"
 
 if uploaded_file:
     cache_id = f"{uploaded_file.name}_{selected_mode}"
     if st.session_state.active_fn != cache_id:
-        txt, ext = "", uploaded_file.name.split(".")[-1].lower()
+        txt = ""
+        ext = uploaded_file.name.split(".").pop().lower()
         try:
-            def extract(f_obj, e):
-                if e == "pdf": return "".join([p.extract_text() or "" for p in PdfReader(f_obj).pages])
-                if e == "docx": return docx2txt.process(f_obj)
-                if e == "txt": return f_obj.read().decode("utf-8")
-                return ""
-            
             if ext == "zip":
                 with zipfile.ZipFile(uploaded_file) as z:
                     for info in z.infolist():
-                        if not info.filename.startswith('__MACOSX/') and not info.is_dir():
-                            inner_ext = info.filename.split(".")[-1].lower()
+                        if not info.filename.startswith("__MACOSX/") and not info.is_dir():
+                            inner_ext = info.filename.split(".").pop().lower()
                             with z.open(info) as f:
-                                txt += extract(io.BytesIO(f.read()) if inner_ext != "txt" else f, inner_ext) + "\n"
+                                data_stream = io.BytesIO(f.read()) if inner_ext != "txt" else f
+                                txt += extract_text(data_stream, inner_ext) + "\n"
             else:
-                txt = extract(uploaded_file, ext)
-                
+                txt = extract_text(uploaded_file, ext)
+
             if txt.strip():
                 profile_name = detect_profile(txt) if selected_mode == "Auto-Detect" else selected_mode
-                cfg = PROFILES[profile_name]
+                cfg = PROFILES.get(profile_name)
                 sentences = re.split(r'(?<=[\.!?])\s+', txt)
 
-                st.session_state.fin = list(set([s.strip() for s in sentences if any(k in s.lower() for k in cfg["p1"]) and len(s.strip()) > 15]))[:5]
-                st.session_state.ops = list(set([s.strip() for s in sentences if any(k in s.lower() for k in cfg["p2"]) and len(s.strip()) > 15]))[:5]
-                st.session_state.rsk = list(set([s.strip() for s in sentences if any(k in s.lower() for k in cfg["p3"]) and len(s.strip()) > 15]))[:5]
-                st.session_state.active_fn = cache_id
